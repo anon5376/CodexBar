@@ -4385,6 +4385,35 @@ enum CostUsageScanner {
                 forkedAt: forkTimestamp ?? "")
         }
 
+        /// Codex Desktop paginated rollouts keep the original `forked_from_id` while continuing the
+        /// same cumulative counter in a new file. The ancestor snapshot is then far below the first
+        /// `total - last` gap (the previous page's last total), and totals-only fork accounting bills
+        /// the whole thread to the new page. Raise the inherited baseline to that local proof.
+        func raiseInheritedBaselineIfContinuedCounter(
+            total: CostUsageCodexTotals,
+            last: CostUsageCodexTotals)
+        {
+            guard previousTotals == nil, let currentInherited = inheritedTotals else { return }
+            guard Self.codexTotalsAtLeast(total, last) else { return }
+            let localInherited = Self.codexTotalDelta(from: last, to: total)
+            guard localInherited.input > 0 || localInherited.cached > 0 || localInherited.output > 0 else {
+                return
+            }
+            guard Self.codexTotalsAtLeast(localInherited, currentInherited),
+                  !Self.codexTotalsEqual(localInherited, currentInherited)
+            else { return }
+            self.log.debug(
+                "Codex cost usage raised inherited fork baseline from first total-last",
+                metadata: [
+                    "sessionId": sessionId ?? "unknown",
+                    "forkedFromId": forkedFromId ?? "unknown",
+                    "ancestorInput": String(currentInherited.input),
+                    "localInput": String(localInherited.input),
+                ])
+            inheritedTotals = localInherited
+            remainingInheritedTotals = localInherited
+        }
+
         func handleSessionMetadata(_ metadata: CodexSessionMetadata) throws {
             // The first parsed session_meta is the authoritative leaf. Copied prefixes can
             // contain many embedded ancestor metas; they are shape evidence, never new identity.
@@ -4441,6 +4470,9 @@ enum CostUsageScanner {
             // a trustworthy child-owned suffix establishes the inherited baseline. Publishing
             // best-effort `last` rows here can replay billions of copied-prefix tokens.
             guard !hasUnresolvedForkBaseline else { return }
+            if let total, let last {
+                raiseInheritedBaselineIfContinuedCounter(total: total, last: last)
+            }
 
             var deltaInput = 0
             var deltaCached = 0
