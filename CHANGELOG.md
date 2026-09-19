@@ -13,7 +13,7 @@
 
 ### Fixed
 
-- Codex costs: stop billing a paginated rollout page for its whole inherited thread. Continuation files keep the original `forked_from_id` while `total_token_usage` continues from the previous page, so the ancestor snapshot was far too small and totals-only fork accounting dumped hundreds of millions of tokens onto the page's first day.
+- Codex costs: stop billing a paginated rollout page for its whole inherited thread. Continuation files keep the original `forked_from_id` while `total_token_usage` continues from the previous page, so the ancestor snapshot was far too small and totals-only fork accounting dumped hundreds of millions of tokens onto the page's first day (#3753).
 - Codex costs: recover excess cached request rows from their original session files, retain pricing through interrupted scans, and avoid guessing request boundaries or conflicting prices (#3741, related to #3618). Thanks @BUKOWSKIREAL!
 
 ## 0.61.0 — 2026-09-18
