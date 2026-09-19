@@ -109,6 +109,10 @@
 "Cookie: …" = "Cookie: …";
 "CopilotDeviceFlow" = "CopilotDeviceFlow";
 "Cost" = "Cost";
+"Token history" = "Token history";
+"Local token history · dollar costs unavailable" = "Local token history · dollar costs unavailable";
+"Partial local history · recorded token subtotal" = "Partial local history · recorded token subtotal";
+"Local token history is unavailable or incomplete." = "Local token history is unavailable or incomplete.";
 "Could not add Codex account" = "Could not add Codex account";
 "Could not open Terminal for Gemini" = "Could not open Terminal for Gemini";
 "Could not start claude /login" = "Could not start claude /login";
@@ -871,6 +875,12 @@
 "usage_percent_suffix_used" = "used";
 "Store multiple DeepSeek API keys." = "Store multiple DeepSeek API keys.";
 "This week" = "This week";
+"Current window" = "Current window";
+"Last week" = "Last week";
+"%d weeks ago" = "%d weeks ago";
+"Previous window" = "Previous window";
+"%d windows ago" = "%d windows ago";
+"Recent windows" = "Recent windows";
 "Week" = "Week";
 "Month" = "Month";
 "Models" = "Models";
@@ -1597,3 +1607,7 @@
 "overview_layout_subtitle" = "Choose how much information Overview shows.";
 "overview_layout_detailed" = "Detailed";
 "overview_layout_compact" = "Compact";
+
+"section_widgets" = "Widgets";
+"account_widgets_title" = "Keep accounts updated for widgets";
+"account_widgets_description" = "Choose an account in each Account Usage widget. Refreshes up to six accounts per provider.";

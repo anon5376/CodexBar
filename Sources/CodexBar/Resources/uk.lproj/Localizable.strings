@@ -150,6 +150,10 @@
 "Cookie: …" = "Печиво: …";
 "CopilotDeviceFlow" = "CopilotDeviceFlow";
 "Cost" = "Вартість";
+"Token history" = "Історія токенів";
+"Local token history · dollar costs unavailable" = "Локальна історія токенів · вартість у доларах недоступна";
+"Partial local history · recorded token subtotal" = "Неповна локальна історія · проміжна сума записаних токенів";
+"Local token history is unavailable or incomplete." = "Локальна історія токенів недоступна або неповна.";
 "Could not add Codex account" = "Не вдалося додати обліковий запис Codex";
 "Could not open Terminal for Gemini" = "Не вдалося відкрити термінал для Gemini";
 "Could not start claude /login" = "Не вдалося запустити claude /login";
@@ -882,6 +886,12 @@
 "usage_percent_suffix_used" = "використовується";
 "Store multiple DeepSeek API keys." = "Зберігайте кілька ключів DeepSeek API.";
 "This week" = "Цього тижня";
+"Current window" = "Поточне вікно";
+"Last week" = "Минулого тижня";
+"%d weeks ago" = "%d тиж. тому";
+"Previous window" = "Попереднє вікно";
+"%d windows ago" = "%d вікн. тому";
+"Recent windows" = "Недавні вікна";
 "Week" = "тиждень";
 "Month" = "місяць";
 "Models" = "Моделі";
@@ -1593,3 +1603,7 @@
 "overview_layout_subtitle" = "Виберіть, скільки інформації показувати в огляді.";
 "overview_layout_detailed" = "Докладно";
 "overview_layout_compact" = "Компактний";
+
+"section_widgets" = "Віджети";
+"account_widgets_title" = "Оновлювати дані облікових записів для віджетів";
+"account_widgets_description" = "Виберіть обліковий запис у кожному віджеті Account Usage. Оновлює до шести облікових записів для кожного постачальника.";

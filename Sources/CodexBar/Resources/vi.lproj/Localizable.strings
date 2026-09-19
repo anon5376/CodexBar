@@ -150,6 +150,10 @@
 "Cookie: …" = "Cookie: …";
 "CopilotDeviceFlow" = "CopilotDeviceFlow";
 "Cost" = "Chi phí";
+"Token history" = "Lịch sử token";
+"Local token history · dollar costs unavailable" = "Lịch sử token cục bộ · chưa có chi phí bằng đô la";
+"Partial local history · recorded token subtotal" = "Lịch sử cục bộ một phần · tổng phụ token đã ghi nhận";
+"Local token history is unavailable or incomplete." = "Lịch sử token cục bộ không có hoặc chưa đầy đủ.";
 "Could not add Codex account" = "Không thể thêm tài khoản Codex";
 "Could not open Terminal for Gemini" = "Không thể mở Terminal cho Gemini";
 "Could not start claude /login" = "Không thể bắt đầu claude /đăng nhập";
@@ -878,6 +882,12 @@
 "usage_percent_suffix_used" = "đã sử dụng";
 "Store multiple DeepSeek API keys." = "Lưu trữ nhiều khóa DeepSeek API.";
 "This week" = "Tuần này";
+"Current window" = "Cửa sổ hiện tại";
+"Last week" = "Tuần trước";
+"%d weeks ago" = "%d tuần trước";
+"Previous window" = "Cửa sổ trước";
+"%d windows ago" = "%d cửa sổ trước";
+"Recent windows" = "Cửa sổ gần đây";
 "Week" = "Tuần";
 "Month" = "Tháng";
 "Models" = "Mô hình";
@@ -1594,3 +1604,7 @@
 "overview_layout_subtitle" = "Chọn lượng thông tin hiển thị trong Tổng quan.";
 "overview_layout_detailed" = "Chi tiết";
 "overview_layout_compact" = "Gọn";
+
+"section_widgets" = "Tiện ích";
+"account_widgets_title" = "Cập nhật tài khoản cho tiện ích";
+"account_widgets_description" = "Chọn một tài khoản trong mỗi tiện ích Account Usage. Làm mới tối đa sáu tài khoản cho mỗi nhà cung cấp.";

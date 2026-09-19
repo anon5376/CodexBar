@@ -132,6 +132,10 @@
 "Cookie: …" = "Cookie: …";
 "CopilotDeviceFlow" = "CopilotDeviceFlow";
 "Cost" = "Cost";
+"Token history" = "Historial de tokens";
+"Local token history · dollar costs unavailable" = "Historial local de tokens · costos en dòlars no disponibles";
+"Partial local history · recorded token subtotal" = "Historial local parcial · subtotal de tokens registrats";
+"Local token history is unavailable or incomplete." = "L’historial local de tokens no està disponible o és incomplet.";
 "Could not add Codex account" = "No s'ha pogut afegir el compte de Codex";
 "Could not open Terminal for Gemini" = "No s'ha pogut obrir el Terminal per a Gemini";
 "Could not start claude /login" = "No s'ha pogut iniciar claude /login";
@@ -895,6 +899,12 @@
 "Latest billing day" = "Últim dia de facturació";
 "Latest billing day (%@)" = "Últim dia de facturació (%@)";
 "This week" = "Aquesta setmana";
+"Current window" = "Finestra actual";
+"Last week" = "La setmana passada";
+"%d weeks ago" = "fa %d setmanes";
+"Previous window" = "Finestra anterior";
+"%d windows ago" = "fa %d finestres";
+"Recent windows" = "Finestres recents";
 "This month" = "Aquest mes";
 "Week" = "Setmana";
 "Month" = "Mes";
@@ -1595,3 +1605,7 @@
 "overview_layout_subtitle" = "Trieu quanta informació mostra el Resum.";
 "overview_layout_detailed" = "Detallat";
 "overview_layout_compact" = "Compacte";
+
+"section_widgets" = "Ginys";
+"account_widgets_title" = "Mantén els comptes actualitzats per als ginys";
+"account_widgets_description" = "Tria un compte a cada giny Account Usage. Actualitza fins a sis comptes per proveïdor.";

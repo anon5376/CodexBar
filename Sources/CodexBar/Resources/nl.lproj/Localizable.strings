@@ -150,6 +150,10 @@
 "Cookie: …" = "Cookie: …";
 "CopilotDeviceFlow" = "CopilotDeviceFlow";
 "Cost" = "Kosten";
+"Token history" = "Tokengeschiedenis";
+"Local token history · dollar costs unavailable" = "Lokale tokengeschiedenis · kosten in dollars niet beschikbaar";
+"Partial local history · recorded token subtotal" = "Gedeeltelijke lokale geschiedenis · subtotaal van vastgelegde tokens";
+"Local token history is unavailable or incomplete." = "De lokale tokengeschiedenis is niet beschikbaar of onvolledig.";
 "Could not add Codex account" = "Kan Codex-account niet toevoegen";
 "Could not open Terminal for Gemini" = "Kan Terminal voor Gemini niet openen";
 "Could not start claude /login" = "Kan claude /login niet starten";
@@ -882,6 +886,12 @@
 "usage_percent_suffix_used" = "gebruikt";
 "Store multiple DeepSeek API keys." = "Bewaar meerdere DeepSeek API-sleutels.";
 "This week" = "Deze week";
+"Current window" = "Huidig venster";
+"Last week" = "Vorige week";
+"%d weeks ago" = "%d weken geleden";
+"Previous window" = "Vorig venster";
+"%d windows ago" = "%d vensters geleden";
+"Recent windows" = "Recente vensters";
 "Week" = "Week";
 "Month" = "Maand";
 "Models" = "Modellen";
@@ -1592,3 +1602,7 @@
 "overview_layout_subtitle" = "Kies hoeveel informatie het overzicht toont.";
 "overview_layout_detailed" = "Gedetailleerd";
 "overview_layout_compact" = "Compact";
+
+"section_widgets" = "Widgets";
+"account_widgets_title" = "Accounts voor widgets actueel houden";
+"account_widgets_description" = "Kies een account in elke Account Usage-widget. Werkt maximaal zes accounts per aanbieder bij.";

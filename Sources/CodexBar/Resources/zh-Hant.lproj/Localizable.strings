@@ -153,6 +153,10 @@
 "Cookie: …" = "Cookie：…";
 "CopilotDeviceFlow" = "Copilot 裝置流程";
 "Cost" = "費用";
+"Token history" = "Token 歷史";
+"Local token history · dollar costs unavailable" = "本機 Token 歷史 · 無美元費用資料";
+"Partial local history · recorded token subtotal" = "部分本機歷史 · 已記錄 Token 小計";
+"Local token history is unavailable or incomplete." = "本機 Token 歷史無法使用或不完整。";
 "Could not add Codex account" = "無法新增 Codex 帳號";
 "Could not open Terminal for Gemini" = "無法為 Gemini 開啟終端";
 "Could not start claude /login" = "無法啟動 claude /login";
@@ -898,6 +902,12 @@
 "Latest billing day" = "最新帳單日";
 "Latest billing day (%@)" = "最新帳單日（%@）";
 "This week" = "本週";
+"Current window" = "目前視窗";
+"Last week" = "上週";
+"%d weeks ago" = "%d 週前";
+"Previous window" = "上一視窗";
+"%d windows ago" = "%d 個視窗前";
+"Recent windows" = "最近視窗";
 "Week" = "週";
 "Month" = "月";
 "Models" = "模型";
@@ -1624,3 +1634,7 @@
 "overview_layout_subtitle" = "選擇「概覽」顯示的資訊量。";
 "overview_layout_detailed" = "詳細";
 "overview_layout_compact" = "精簡";
+
+"section_widgets" = "小工具";
+"account_widgets_title" = "為小工具保持帳戶更新";
+"account_widgets_description" = "在每個 Account Usage 小工具中選擇一個帳戶。每個供應商最多重新整理六個帳戶。";

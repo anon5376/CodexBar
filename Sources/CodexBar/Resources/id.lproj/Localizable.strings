@@ -133,6 +133,10 @@
 "Cookie: …" = "Cookie: …";
 "CopilotDeviceFlow" = "CopilotDeviceFlow";
 "Cost" = "Biaya";
+"Token history" = "Riwayat token";
+"Local token history · dollar costs unavailable" = "Riwayat token lokal · biaya dolar tidak tersedia";
+"Partial local history · recorded token subtotal" = "Riwayat lokal sebagian · subtotal token tercatat";
+"Local token history is unavailable or incomplete." = "Riwayat token lokal tidak tersedia atau tidak lengkap.";
 "Could not add Codex account" = "Tidak dapat menambahkan akun Codex";
 "Could not open Terminal for Gemini" = "Tidak dapat membuka Terminal untuk Gemini";
 "Could not start claude /login" = "Tidak dapat memulai claude /login";
@@ -890,6 +894,12 @@
 "usage_percent_suffix_used" = "terpakai";
 "Store multiple DeepSeek API keys." = "Simpan beberapa kunci API DeepSeek.";
 "This week" = "Minggu ini";
+"Current window" = "Jendela saat ini";
+"Last week" = "Minggu lalu";
+"%d weeks ago" = "%d minggu lalu";
+"Previous window" = "Jendela sebelumnya";
+"%d windows ago" = "%d jendela lalu";
+"Recent windows" = "Jendela terbaru";
 "Week" = "Minggu";
 "Month" = "Bulan";
 "Models" = "Model";
@@ -1596,3 +1606,7 @@
 "overview_layout_subtitle" = "Pilih seberapa banyak informasi yang ditampilkan Ikhtisar.";
 "overview_layout_detailed" = "Terperinci";
 "overview_layout_compact" = "Ringkas";
+
+"section_widgets" = "Widget";
+"account_widgets_title" = "Perbarui akun untuk widget";
+"account_widgets_description" = "Pilih akun di setiap widget Account Usage. Memperbarui hingga enam akun per penyedia.";

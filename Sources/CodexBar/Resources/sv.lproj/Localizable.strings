@@ -150,6 +150,10 @@
 "Cookie: …" = "Cookie: …";
 "CopilotDeviceFlow" = "CopilotDeviceFlow";
 "Cost" = "Kostnad";
+"Token history" = "Tokenhistorik";
+"Local token history · dollar costs unavailable" = "Lokal tokenhistorik · kostnader i dollar saknas";
+"Partial local history · recorded token subtotal" = "Delvis lokal historik · delsumma för registrerade token";
+"Local token history is unavailable or incomplete." = "Lokal tokenhistorik saknas eller är ofullständig.";
 "Could not add Codex account" = "Kunde inte lägga till Codex-konto";
 "Could not open Terminal for Gemini" = "Kunde inte öppna Terminal för Gemini";
 "Could not start claude /login" = "Kunde inte starta claude /login";
@@ -881,6 +885,12 @@
 "usage_percent_suffix_used" = "förbrukat";
 "Store multiple DeepSeek API keys." = "Spara flera DeepSeek-API-nycklar.";
 "This week" = "Den här veckan";
+"Current window" = "Aktuellt fönster";
+"Last week" = "Förra veckan";
+"%d weeks ago" = "för %d veckor sedan";
+"Previous window" = "Föregående fönster";
+"%d windows ago" = "för %d fönster sedan";
+"Recent windows" = "Senaste fönster";
 "Week" = "Vecka";
 "Month" = "Månad";
 "Models" = "Modeller";
@@ -1592,3 +1602,7 @@
 "overview_layout_subtitle" = "Välj hur mycket information som visas i översikten.";
 "overview_layout_detailed" = "Detaljerad";
 "overview_layout_compact" = "Kompakt";
+
+"section_widgets" = "Widgetar";
+"account_widgets_title" = "Håll konton uppdaterade för widgetar";
+"account_widgets_description" = "Välj ett konto i varje Account Usage-widget. Uppdaterar upp till sex konton per leverantör.";

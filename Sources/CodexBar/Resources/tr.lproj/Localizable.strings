@@ -133,6 +133,10 @@
 "Cookie: …" = "Çerez: …";
 "CopilotDeviceFlow" = "CopilotDeviceFlow";
 "Cost" = "Maliyet";
+"Token history" = "Token geçmişi";
+"Local token history · dollar costs unavailable" = "Yerel token geçmişi · dolar maliyetleri mevcut değil";
+"Partial local history · recorded token subtotal" = "Kısmi yerel geçmiş · kaydedilen token ara toplamı";
+"Local token history is unavailable or incomplete." = "Yerel token geçmişi mevcut değil veya eksik.";
 "Could not add Codex account" = "Codex hesabı eklenemedi";
 "Could not open Terminal for Gemini" = "Gemini için Terminal açılamadı";
 "Could not start claude /login" = "claude /login başlatılamadı";
@@ -884,6 +888,12 @@
 "usage_percent_suffix_used" = "kullanıldı";
 "Store multiple DeepSeek API keys." = "Birden fazla DeepSeek API anahtarı depolayın.";
 "This week" = "Bu hafta";
+"Current window" = "Geçerli pencere";
+"Last week" = "Geçen hafta";
+"%d weeks ago" = "%d hafta önce";
+"Previous window" = "Önceki pencere";
+"%d windows ago" = "%d pencere önce";
+"Recent windows" = "Son pencereler";
 "Week" = "Hafta";
 "Month" = "Ay";
 "Models" = "Modeller";
@@ -1595,3 +1605,7 @@
 "overview_layout_subtitle" = "Genel Bakış’ın ne kadar bilgi göstereceğini seçin.";
 "overview_layout_detailed" = "Ayrıntılı";
 "overview_layout_compact" = "Kompakt";
+
+"section_widgets" = "Araç takımları";
+"account_widgets_title" = "Araç takımları için hesapları güncel tut";
+"account_widgets_description" = "Her Account Usage araç takımında bir hesap seçin. Sağlayıcı başına en fazla altı hesabı yeniler.";

@@ -133,6 +133,10 @@
 "Cookie: …" = "کوکی: ...";
 "CopilotDeviceFlow" = "CopilotDeviceFlow";
 "Cost" = "هزینه";
+"Token history" = "تاریخچهٔ توکن‌ها";
+"Local token history · dollar costs unavailable" = "تاریخچهٔ محلی توکن‌ها · هزینه‌های دلاری در دسترس نیست";
+"Partial local history · recorded token subtotal" = "تاریخچهٔ محلی ناقص · جمع جزئی توکن‌های ثبت‌شده";
+"Local token history is unavailable or incomplete." = "تاریخچهٔ محلی توکن‌ها در دسترس نیست یا ناقص است.";
 "Could not add Codex account" = "نتوانستم حساب Codex اضافه کنم";
 "Could not open Terminal for Gemini" = "نتوانستم ترمینال را برای Gemini باز کنم";
 "Could not start claude /login" = "نتوانستم کلود را شروع /login";
@@ -888,6 +892,12 @@
 "usage_percent_suffix_used" = "استفاده شده";
 "Store multiple DeepSeek API keys." = "چند کلید DeepSeek API را ذخیره کنید.";
 "This week" = "این هفته";
+"Current window" = "پنجره فعلی";
+"Last week" = "هفته گذشته";
+"%d weeks ago" = "%d هفته پیش";
+"Previous window" = "پنجره قبلی";
+"%d windows ago" = "%d پنجره پیش";
+"Recent windows" = "پنجره‌های اخیر";
 "Week" = "هفته";
 "Month" = "ماه";
 "Models" = "مدل ها";
@@ -1597,3 +1607,7 @@
 "overview_layout_subtitle" = "میزان اطلاعات نمایش‌داده‌شده در نمای کلی را انتخاب کنید.";
 "overview_layout_detailed" = "با جزئیات";
 "overview_layout_compact" = "فشرده";
+
+"section_widgets" = "ویجت‌ها";
+"account_widgets_title" = "حساب‌ها را برای ویجت‌ها به‌روز نگه دارید";
+"account_widgets_description" = "در هر ویجت Account Usage یک حساب انتخاب کنید. حداکثر شش حساب برای هر ارائه‌دهنده به‌روز می‌شود.";

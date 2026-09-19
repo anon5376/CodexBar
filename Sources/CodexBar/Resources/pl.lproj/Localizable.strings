@@ -133,6 +133,10 @@
 "Cookie: …" = "Cookie: …";
 "CopilotDeviceFlow" = "Przepływ urządzenia Copilot";
 "Cost" = "Koszt";
+"Token history" = "Historia tokenów";
+"Local token history · dollar costs unavailable" = "Lokalna historia tokenów · koszty w dolarach niedostępne";
+"Partial local history · recorded token subtotal" = "Częściowa historia lokalna · suma zarejestrowanych tokenów";
+"Local token history is unavailable or incomplete." = "Lokalna historia tokenów jest niedostępna lub niepełna.";
 "Could not add Codex account" = "Nie udało się dodać konta Codex";
 "Could not open Terminal for Gemini" = "Nie udało się otworzyć Terminala dla Gemini";
 "Could not start claude /login" = "Nie udało się uruchomić `claude /login`";
@@ -890,6 +894,12 @@
 "usage_percent_suffix_used" = "wykorzystano";
 "Store multiple DeepSeek API keys." = "Przechowuj wiele kluczy API DeepSeek.";
 "This week" = "Ten tydzień";
+"Current window" = "Bieżące okno";
+"Last week" = "Zeszły tydzień";
+"%d weeks ago" = "%d tyg. temu";
+"Previous window" = "Poprzednie okno";
+"%d windows ago" = "%d okna temu";
+"Recent windows" = "Ostatnie okna";
 "Week" = "Tydzień";
 "Month" = "Miesiąc";
 "Models" = "Modele";
@@ -1596,3 +1606,7 @@
 "overview_layout_subtitle" = "Wybierz, ile informacji ma wyświetlać Przegląd.";
 "overview_layout_detailed" = "Szczegółowy";
 "overview_layout_compact" = "Kompaktowy";
+
+"section_widgets" = "Widżety";
+"account_widgets_title" = "Aktualizuj konta dla widżetów";
+"account_widgets_description" = "Wybierz konto w każdym widżecie Account Usage. Odświeża do sześciu kont na dostawcę.";

@@ -206,6 +206,11 @@ and stable account numbers distinguish rows while usable workspace labels remain
 - CLI PTY diagnostics can still parse `Credits:` from saved/manual `/status` output.
 
 ## Cost usage (local log scan)
+
+For a manual comparison with another development machine, run `codexbar cost --provider codex --remote <ssh-host>`.
+Both hosts scan their own native Codex logs once and return separate summaries, retaining their own day boundaries,
+pricing provenance, missing values, and incomplete-request counts. Only bounded totals cross SSH. A remote error keeps
+the local result and returns a nonzero exit code. See [CLI host reporting](cli.md) for the versioned summary contract.
 - Menu source selection:
   - By default, a selected managed account keeps its own `CODEX_HOME` session history.
   - **Local session cost estimates** is a Codex-only opt-in that instead scans this Mac's ambient `$CODEX_HOME`
@@ -241,6 +246,10 @@ and stable account numbers distinguish rows while usable workspace labels remain
     they contain delivery markers or the file ends before child-owned history arrives. Later appends count only
     the child's own deltas. Older per-file parser revisions refresh through the normal scan budget while stored
     history and checkpoints remain available.
+  - Paginated continuation files count only their own suffix when `history_base.thread_id` identifies a previous
+    page rather than the original fork ancestor. Bounded scans retain the resolved fork baseline across restarts
+    and revalidate its parent before resuming. Cross-file request identity includes the timestamp so restarted
+    page-local event indices do not erase distinct requests; exact active/archive copies still deduplicate.
   - pi and OMP sessions count assistant-message usage rows and attribute `openai-codex` assistant usage to Codex.
   - pi-compatible assistant usage is bucketed by assistant-turn timestamp, so mixed-model sessions can contribute to
     multiple days/models correctly.
@@ -280,6 +289,10 @@ and stable account numbers distinguish rows while usable workspace labels remain
     without matching historical pricing remain unpriced. The repair retains the existing database and scan checkpoints.
     Resumes retain the original target anchor alongside the parsed-prefix anchor and follow the scanner's existing
     append-only log contract; identity changes, anchor mismatches, and unexplained same-size large-file edits invalidate pricing.
+    Parser-revision upgrades use the same source validation to preserve matching historical prices when a file
+    grows or a recovery scan is interrupted. Appended requests cannot borrow prices from the historical prefix,
+    and an invalidated pricing map remains invalid through subsequent upgrades. Native stores from 0.62.0's
+    `865a444e01b818f1` fingerprint retain their history while individual files are reparsed with corrected accounting.
   - Fully read empty session fragments retain completion records even when another file contributes the same session.
     They contribute no usage and reparse from the start if they grow. Usage-bearing duplicates and incomplete fragments
     keep their existing accounting and retry rules. Existing 0.56.4 cost caches are adopted without rebuilding

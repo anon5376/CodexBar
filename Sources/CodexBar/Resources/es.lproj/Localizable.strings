@@ -149,6 +149,10 @@
 "Cookie: …" = "Cookie: …";
 "CopilotDeviceFlow" = "CopilotDeviceFlow";
 "Cost" = "Coste";
+"Token history" = "Historial de tokens";
+"Local token history · dollar costs unavailable" = "Historial local de tokens · costes en dólares no disponibles";
+"Partial local history · recorded token subtotal" = "Historial local parcial · subtotal de tokens registrados";
+"Local token history is unavailable or incomplete." = "El historial local de tokens no está disponible o está incompleto.";
 "Could not add Codex account" = "No se pudo añadir la cuenta de Codex";
 "Could not open Terminal for Gemini" = "No se pudo abrir la Terminal para Gemini";
 "Could not start claude /login" = "No se pudo iniciar claude /login";
@@ -897,6 +901,12 @@
 "Latest billing day" = "Último día de facturación";
 "Latest billing day (%@)" = "Último día de facturación (%@)";
 "This week" = "Esta semana";
+"Current window" = "Ventana actual";
+"Last week" = "La semana pasada";
+"%d weeks ago" = "hace %d semanas";
+"Previous window" = "Ventana anterior";
+"%d windows ago" = "hace %d ventanas";
+"Recent windows" = "Ventanas recientes";
 "This month" = "Este mes";
 "Week" = "Semana";
 "Month" = "Mes";
@@ -1591,3 +1601,7 @@
 "overview_layout_subtitle" = "Elige cuánta información muestra Resumen.";
 "overview_layout_detailed" = "Detallado";
 "overview_layout_compact" = "Compacto";
+
+"section_widgets" = "Widgets";
+"account_widgets_title" = "Mantener las cuentas actualizadas para los widgets";
+"account_widgets_description" = "Elige una cuenta en cada widget Account Usage. Actualiza hasta seis cuentas por proveedor.";
