@@ -112,6 +112,104 @@ struct CodexPaginatedHistoryAccountingTests {
     }
 
     @Test
+    func `ordinary fork keeps totals-derived deltas that exceed last`() throws {
+        let env = try CostUsageTestEnvironment()
+        defer { env.cleanup() }
+
+        let day = try env.makeLocalNoon(year: 2026, month: 9, day: 16)
+        let timestamp = env.isoString(for: day)
+        let model = "openai/gpt-5.4"
+        let fileURL = try env.writeCodexSessionFile(
+            day: day,
+            filename: "rollout-\(timestamp)-ordinary-fork.jsonl",
+            contents: try env.jsonl([
+                [
+                    "type": "session_meta",
+                    "timestamp": timestamp,
+                    "payload": [
+                        "id": "child-session",
+                        "forked_from_id": "parent-session",
+                        "timestamp": timestamp,
+                    ],
+                ],
+                self.turnContext(timestamp: timestamp, model: model),
+                self.tokenCount(
+                    timestamp: env.isoString(for: day.addingTimeInterval(1)),
+                    model: model,
+                    total: (input: 1_100, cached: 920, output: 110),
+                    last: (input: 40, cached: 20, output: 5)),
+                self.tokenCount(
+                    timestamp: env.isoString(for: day.addingTimeInterval(2)),
+                    model: model,
+                    total: (input: 1_200, cached: 940, output: 120),
+                    last: (input: 50, cached: 20, output: 10)),
+            ]))
+
+        let parsed = CostUsageScanner.parseCodexFile(
+            fileURL: fileURL,
+            range: CostUsageScanner.CostUsageDayRange(since: day, until: day),
+            inheritedTotalsResolver: { _, _ in
+                .resolved(.init(input: 1_000, cached: 900, output: 100))
+            })
+
+        let dayKey = CostUsageScanner.CostUsageDayRange.dayKey(from: day)
+        let normalized = CostUsagePricing.normalizeCodexModel(model)
+        #expect(parsed.days[dayKey]?[normalized] == [200, 40, 20])
+    }
+
+    @Test
+    func `first paginated page pointing history_base at the fork parent keeps the snapshot`() throws {
+        let env = try CostUsageTestEnvironment()
+        defer { env.cleanup() }
+
+        let day = try env.makeLocalNoon(year: 2026, month: 9, day: 16)
+        let timestamp = env.isoString(for: day)
+        let model = "openai/gpt-5.4"
+        let fileURL = try env.writeCodexSessionFile(
+            day: day,
+            filename: "rollout-\(timestamp)-first-page.jsonl",
+            contents: try env.jsonl([
+                [
+                    "type": "session_meta",
+                    "timestamp": timestamp,
+                    "payload": [
+                        "id": "thread-session",
+                        "forked_from_id": "original-ancestor",
+                        "timestamp": timestamp,
+                        "history_mode": "paginated",
+                        "history_base": [
+                            "thread_id": "original-ancestor",
+                            "end_ordinal_exclusive": 214,
+                            "end_byte_offset": 1_051_670,
+                        ],
+                    ],
+                ],
+                self.turnContext(timestamp: timestamp, model: model),
+                self.tokenCount(
+                    timestamp: env.isoString(for: day.addingTimeInterval(1)),
+                    model: model,
+                    total: (input: 1_100, cached: 920, output: 110),
+                    last: (input: 40, cached: 20, output: 5)),
+                self.tokenCount(
+                    timestamp: env.isoString(for: day.addingTimeInterval(2)),
+                    model: model,
+                    total: (input: 1_200, cached: 940, output: 120),
+                    last: (input: 50, cached: 20, output: 10)),
+            ]))
+
+        let parsed = CostUsageScanner.parseCodexFile(
+            fileURL: fileURL,
+            range: CostUsageScanner.CostUsageDayRange(since: day, until: day),
+            inheritedTotalsResolver: { _, _ in
+                .resolved(.init(input: 1_000, cached: 900, output: 100))
+            })
+
+        let dayKey = CostUsageScanner.CostUsageDayRange.dayKey(from: day)
+        let normalized = CostUsagePricing.normalizeCodexModel(model)
+        #expect(parsed.days[dayKey]?[normalized] == [200, 40, 20])
+    }
+
+    @Test
     func `paginated pages of the same thread do not double-count lifetime totals`() throws {
         let env = try CostUsageTestEnvironment()
         defer { env.cleanup() }
@@ -225,8 +323,145 @@ struct CodexPaginatedHistoryAccountingTests {
 
         // Final cumulative total of the continued thread, plus the ancestor's own 50,
         // with each page owning only its suffix: 50 + 950 + 300 = 1,300.
-        #expect(report.data.map(\.inputTokens).reduce(0) { $0 + ($1 ?? 0) } == 1_300)
+        #expect(self.inputTokens(report) == 1_300)
         #expect(report.data.map(\.outputTokens).reduce(0) { $0 + ($1 ?? 0) } == 110)
+    }
+
+    @Test
+    func `stale parser revision reparses an inflated continuation without forceRescan`() throws {
+        let env = try CostUsageTestEnvironment()
+        defer { env.cleanup() }
+
+        let day = try env.makeLocalNoon(year: 2026, month: 9, day: 16)
+        let timestamp = env.isoString(for: day)
+        let model = "openai/gpt-5.4"
+        let ancestorID = "original-ancestor"
+        let threadID = "thread-session"
+
+        _ = try env.writeCodexSessionFile(
+            day: day,
+            filename: "rollout-\(timestamp)-\(ancestorID).jsonl",
+            contents: try env.jsonl([
+                [
+                    "type": "session_meta",
+                    "timestamp": timestamp,
+                    "payload": ["id": ancestorID, "timestamp": timestamp],
+                ],
+                self.turnContext(timestamp: timestamp, model: model),
+                self.tokenCount(
+                    timestamp: env.isoString(for: day.addingTimeInterval(1)),
+                    model: model,
+                    total: (input: 50, cached: 40, output: 5),
+                    last: (input: 50, cached: 40, output: 5)),
+            ]))
+
+        let pageOneFork = env.isoString(for: day.addingTimeInterval(2))
+        _ = try env.writeCodexSessionFile(
+            day: day,
+            filename: "rollout-\(timestamp)-\(threadID).jsonl",
+            contents: try env.jsonl([
+                [
+                    "type": "session_meta",
+                    "timestamp": pageOneFork,
+                    "payload": [
+                        "id": threadID,
+                        "forked_from_id": ancestorID,
+                        "timestamp": pageOneFork,
+                        "history_mode": "paginated",
+                        "history_base": [
+                            "thread_id": ancestorID,
+                            "end_ordinal_exclusive": 214,
+                            "end_byte_offset": 1_051_670,
+                        ],
+                    ],
+                ],
+                self.turnContext(timestamp: pageOneFork, model: model),
+                self.tokenCount(
+                    timestamp: env.isoString(for: day.addingTimeInterval(3)),
+                    model: model,
+                    total: (input: 150, cached: 120, output: 15),
+                    last: (input: 100, cached: 80, output: 10)),
+                self.tokenCount(
+                    timestamp: env.isoString(for: day.addingTimeInterval(4)),
+                    model: model,
+                    total: (input: 1_000, cached: 800, output: 80),
+                    last: (input: 200, cached: 100, output: 20)),
+            ]))
+
+        let pageTwoStarted = env.isoString(for: day.addingTimeInterval(5))
+        _ = try env.writeCodexSessionFile(
+            day: day,
+            filename: "rollout-\(timestamp)-\(threadID)_page-two.jsonl",
+            contents: try env.jsonl([
+                [
+                    "type": "session_meta",
+                    "timestamp": pageTwoStarted,
+                    "payload": [
+                        "id": threadID,
+                        "session_id": threadID,
+                        "forked_from_id": ancestorID,
+                        "timestamp": pageTwoStarted,
+                        "history_mode": "paginated",
+                        "history_base": [
+                            "thread_id": threadID,
+                            "end_ordinal_exclusive": 400,
+                            "end_byte_offset": 50_000,
+                        ],
+                    ],
+                ],
+                self.turnContext(timestamp: pageTwoStarted, model: model),
+                self.tokenCount(
+                    timestamp: env.isoString(for: day.addingTimeInterval(6)),
+                    model: model,
+                    total: (input: 1_100, cached: 880, output: 90),
+                    last: (input: 100, cached: 80, output: 10)),
+                self.tokenCount(
+                    timestamp: env.isoString(for: day.addingTimeInterval(7)),
+                    model: model,
+                    total: (input: 1_300, cached: 1_000, output: 110),
+                    last: (input: 150, cached: 90, output: 15)),
+            ]))
+
+        var options = CostUsageScanner.Options(
+            codexSessionsRoot: env.codexSessionsRoot,
+            claudeProjectsRoots: nil,
+            cacheRoot: env.cacheRoot)
+        options.refreshMinIntervalSeconds = 0
+
+        let cold = CostUsageScanner.loadDailyReport(
+            provider: .codex,
+            since: day,
+            until: day,
+            now: day,
+            options: options)
+        #expect(self.inputTokens(cold) == 1_300)
+
+        var legacy = CostUsageStoreAccess.read(cacheRoot: env.cacheRoot)
+        let pageTwoPath = try #require(legacy.files.keys.first { $0.contains("_page-two") })
+        var pageTwo = try #require(legacy.files[pageTwoPath])
+        let dayKey = CostUsageScanner.CostUsageDayRange.dayKey(from: day)
+        let normalized = CostUsagePricing.normalizeCodexModel(model)
+        pageTwo.days = [dayKey: [normalized: [1_250, 960, 105]]]
+        pageTwo.codexParserRevision = CostUsageFileUsage.currentCodexParserRevision - 1
+        legacy.files[pageTwoPath] = pageTwo
+        legacy.days = [dayKey: [normalized: [2_250, 1_760, 185]]]
+        CostUsageStoreAccess.replace(cacheRoot: env.cacheRoot, cache: legacy)
+
+        options.forceRescan = false
+        let warm = CostUsageScanner.loadDailyReport(
+            provider: .codex,
+            since: day,
+            until: day,
+            now: day.addingTimeInterval(60),
+            options: options)
+        #expect(self.inputTokens(warm) == 1_300)
+        #expect(
+            CostUsageStoreAccess.read(cacheRoot: env.cacheRoot).files[pageTwoPath]?.hasCurrentCodexParser
+                == true)
+    }
+
+    private func inputTokens(_ report: CostUsageDailyReport) -> Int {
+        report.data.map(\.inputTokens).reduce(0) { $0 + ($1 ?? 0) }
     }
 
     private func turnContext(timestamp: String, model: String) -> [String: Any] {
