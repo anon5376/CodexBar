@@ -158,6 +158,101 @@ struct CodexPaginatedHistoryAccountingTests {
     }
 
     @Test
+    func `direct fork ignores parent prefix when indexed parent page starts after fork`() throws {
+        let env = try CostUsageTestEnvironment()
+        defer { env.cleanup() }
+
+        let day = try env.makeLocalNoon(year: 2026, month: 9, day: 16)
+        let timestamp = env.isoString(for: day)
+        let model = "openai/gpt-5.4"
+        let parentID = "parent-session"
+        let parentFile = try env.writeCodexSessionFile(
+            day: day,
+            filename: "rollout-\(timestamp)-\(parentID).jsonl",
+            contents: env.jsonl([
+                [
+                    "type": "session_meta",
+                    "timestamp": timestamp,
+                    "payload": ["id": parentID, "timestamp": timestamp],
+                ],
+                self.turnContext(timestamp: timestamp, model: model),
+                self.tokenCount(
+                    timestamp: env.isoString(for: day.addingTimeInterval(1)),
+                    model: model,
+                    total: (input: 1000, cached: 900, output: 100),
+                    last: (input: 1000, cached: 900, output: 100)),
+            ]))
+
+        let forkedAt = env.isoString(for: day.addingTimeInterval(2))
+        let childFile = try env.writeCodexSessionFile(
+            day: day,
+            filename: "rollout-\(timestamp)-child-session.jsonl",
+            contents: env.jsonl([
+                [
+                    "type": "session_meta",
+                    "timestamp": forkedAt,
+                    "payload": [
+                        "id": "child-session",
+                        "forked_from_id": parentID,
+                        "timestamp": forkedAt,
+                        "history_mode": "paginated",
+                        "history_base": [
+                            "thread_id": parentID,
+                            "end_ordinal_exclusive": 100,
+                            "end_byte_offset": 10000,
+                        ],
+                    ],
+                ],
+                self.turnContext(timestamp: forkedAt, model: model),
+                self.tokenCount(
+                    timestamp: env.isoString(for: day.addingTimeInterval(3)),
+                    model: model,
+                    total: (input: 1100, cached: 920, output: 110),
+                    last: (input: 100, cached: 20, output: 10)),
+                self.tokenCount(
+                    timestamp: env.isoString(for: day.addingTimeInterval(4)),
+                    model: model,
+                    total: (input: 1250, cached: 940, output: 125),
+                    last: (input: 150, cached: 20, output: 15)),
+            ]))
+
+        let futureParentFile = try env.writeCodexSessionFile(
+            day: day,
+            filename: "rollout-\(timestamp)-\(parentID)_future-page.jsonl",
+            contents: env.jsonl([
+                [
+                    "type": "session_meta",
+                    "timestamp": env.isoString(for: day.addingTimeInterval(5)),
+                    "payload": ["id": parentID, "timestamp": env.isoString(for: day.addingTimeInterval(5))],
+                ],
+                self.turnContext(timestamp: env.isoString(for: day.addingTimeInterval(5)), model: model),
+                self.tokenCount(
+                    timestamp: env.isoString(for: day.addingTimeInterval(6)),
+                    model: model,
+                    total: (input: 2000, cached: 1500, output: 200),
+                    last: (input: 100, cached: 80, output: 10)),
+            ]))
+
+        let fileIndex = CostUsageScanner.CodexSessionFileIndex(
+            files: [parentFile, futureParentFile],
+            roots: [env.codexSessionsRoot],
+            cachedSessionFiles: [parentID: futureParentFile])
+        let resolver = CostUsageScanner.CodexInheritedTotalsResolver(
+            fileIndex: fileIndex,
+            checkCancellation: nil)
+        let parsed = CostUsageScanner.parseCodexFile(
+            fileURL: childFile,
+            range: CostUsageScanner.CostUsageDayRange(since: day, until: day),
+            inheritedTotalsResolver: { sessionID, cutoff in
+                try! resolver.inheritedTotals(for: sessionID, atOrBefore: cutoff)
+            })
+
+        let dayKey = CostUsageScanner.CostUsageDayRange.dayKey(from: day)
+        let normalized = CostUsagePricing.normalizeCodexModel(model)
+        #expect(parsed.days[dayKey]?[normalized] == [250, 40, 25])
+    }
+
+    @Test
     func `first paginated page pointing history_base at the fork parent keeps the snapshot`() throws {
         let env = try CostUsageTestEnvironment()
         defer { env.cleanup() }

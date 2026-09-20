@@ -338,6 +338,7 @@ enum CostUsageScanner {
         let metadata: CodexSessionMetadata
         let inheritedTotals: CostUsageCodexTotals?
         let remainingInheritedTotals: CostUsageCodexTotals?
+        var parentSnapshotsStartAfterFork: Bool?
     }
 
     struct CodexPricingEvidence: Codable, Equatable {
@@ -421,6 +422,9 @@ enum CostUsageScanner {
 
     enum CodexForkBaseline {
         case resolved(CostUsageCodexTotals?)
+        /// The selected parent rollout is complete enough for the cutoff, but its first token
+        /// snapshot is later than the fork. This can happen when paginated files reuse a session ID.
+        case resolvedAfterCutoff
         case unresolved
     }
 
@@ -1619,6 +1623,10 @@ enum CostUsageScanner {
                 self.isComplete = isComplete
             }
 
+            var firstTimestamp: String? {
+                self.indexedEvents?.first?.timestamp ?? self.snapshots?.first?.timestamp
+            }
+
             var lastTimestamp: String? {
                 self.indexedEvents?.last?.timestamp ?? self.snapshots?.last?.timestamp
             }
@@ -1697,6 +1705,19 @@ enum CostUsageScanner {
                 cutoffDate: cutoffDate)
             if let dependencyKey = resolution.dependencyKey {
                 self.resolvedDependencyKeys[sessionId] = dependencyKey
+            }
+            if inherited == nil,
+               let firstTimestamp = resolution.firstTimestamp
+            {
+                let firstDate = CostUsageScanner.dateFromTimestamp(firstTimestamp)
+                let startsAfterCutoff: Bool = if let firstDate, let cutoffDate {
+                    firstDate > cutoffDate
+                } else {
+                    firstTimestamp > cutoffTimestamp
+                }
+                if startsAfterCutoff {
+                    return .resolvedAfterCutoff
+                }
             }
             return .resolved(inherited)
         }
@@ -4322,6 +4343,7 @@ enum CostUsageScanner {
             latestActivityUnixMs: nil)
         var inheritedTotals = initialForkAccountingState?.inheritedTotals
         var remainingInheritedTotals = initialForkAccountingState?.remainingInheritedTotals
+        var parentSnapshotsStartAfterFork = initialForkAccountingState?.parentSnapshotsStartAfterFork == true
         var forkBaselineResolved = initialForkAccountingState != nil
         var hasUnresolvedForkBaseline = false
         var currentTurnID = initialCodexTurnID
@@ -4440,6 +4462,12 @@ enum CostUsageScanner {
             case let .resolved(totals):
                 inheritedTotals = totals
                 remainingInheritedTotals = totals
+                parentSnapshotsStartAfterFork = false
+                hasUnresolvedForkBaseline = false
+            case .resolvedAfterCutoff:
+                inheritedTotals = nil
+                remainingInheritedTotals = nil
+                parentSnapshotsStartAfterFork = true
                 hasUnresolvedForkBaseline = false
             case .unresolved:
                 hasUnresolvedForkBaseline = true
@@ -4463,38 +4491,45 @@ enum CostUsageScanner {
                 forkedAt: forkTimestamp ?? "")
         }
 
-        /// Codex Desktop paginated rollouts keep the original `forked_from_id` while continuing the
-        /// same cumulative counter in a new file. The ancestor snapshot is then far below the first
-        /// `total - last` gap (the previous page's last total), and totals-only fork accounting bills
-        /// the whole thread to the new page. Raise the inherited baseline to that local proof only
-        /// when `history_base.thread_id` is not the fork parent already subtracted by #1164.
+        /// Codex Desktop can reuse one session ID across paginated rollout files. Continuation pages
+        /// keep the original `forked_from_id`, while a direct fork can resolve that parent ID to a
+        /// later page whose first snapshot is after the fork. In both shapes the first `total - last`
+        /// is the locally proven copied prefix; using the stale or absent parent baseline would bill
+        /// that prefix again. Ordinary forks with a usable parent snapshot retain #1164 accounting.
         func raiseInheritedBaselineIfContinuedCounter(
             total: CostUsageCodexTotals,
             last: CostUsageCodexTotals)
         {
-            guard previousTotals == nil, let currentInherited = inheritedTotals else { return }
-            guard let historyBaseThreadId,
-                  !CodexSubagentRolloutShape.sameConcreteSessionID(historyBaseThreadId, forkedFromId)
-            else { return }
+            guard previousTotals == nil, let historyBaseThreadId else { return }
+            let historyBaseIsForkParent = CodexSubagentRolloutShape.sameConcreteSessionID(
+                historyBaseThreadId,
+                forkedFromId)
+            guard !historyBaseIsForkParent || parentSnapshotsStartAfterFork else { return }
             guard Self.codexTotalsAtLeast(total, last) else { return }
             let localInherited = Self.codexTotalDelta(from: last, to: total)
             guard localInherited.input > 0 || localInherited.cached > 0 || localInherited.output > 0 else {
                 return
             }
-            guard Self.codexTotalsAtLeast(localInherited, currentInherited),
-                  !Self.codexTotalsEqual(localInherited, currentInherited)
-            else { return }
+            if let currentInherited = inheritedTotals {
+                guard Self.codexTotalsAtLeast(localInherited, currentInherited),
+                      !Self.codexTotalsEqual(localInherited, currentInherited)
+                else { return }
+            } else {
+                guard parentSnapshotsStartAfterFork else { return }
+            }
             self.log.debug(
                 "Codex cost usage raised inherited fork baseline from first total-last",
                 metadata: [
                     "sessionId": sessionId ?? "unknown",
                     "forkedFromId": forkedFromId ?? "unknown",
                     "historyBaseThreadId": historyBaseThreadId,
-                    "ancestorInput": String(currentInherited.input),
+                    "ancestorInput": String(inheritedTotals?.input ?? 0),
                     "localInput": String(localInherited.input),
+                    "parentSnapshotsStartAfterFork": String(parentSnapshotsStartAfterFork),
                 ])
             inheritedTotals = localInherited
             remainingInheritedTotals = localInherited
+            parentSnapshotsStartAfterFork = false
         }
 
         func handleSessionMetadata(_ metadata: CodexSessionMetadata) throws {
@@ -5238,7 +5273,7 @@ enum CostUsageScanner {
                                     ownedSuffix = candidate.ownedSuffix
                                     parentConfirmedLocalBoundary = true
                                 }
-                            case .unresolved:
+                            case .resolvedAfterCutoff, .unresolved:
                                 break
                             }
                         }
@@ -5310,7 +5345,8 @@ enum CostUsageScanner {
                     subagentHistoryStartOrdinal: nil,
                     historyBaseThreadId: historyBaseThreadId),
                 inheritedTotals: inheritedTotals,
-                remainingInheritedTotals: remainingInheritedTotals)
+                remainingInheritedTotals: remainingInheritedTotals,
+                parentSnapshotsStartAfterFork: parentSnapshotsStartAfterFork ? true : nil)
         } else {
             nil
         }
