@@ -1623,12 +1623,25 @@ enum CostUsageScanner {
                 self.isComplete = isComplete
             }
 
+            private var timestamps: [String] {
+                self.indexedEvents?.map(\.timestamp) ?? self.snapshots?.map(\.timestamp) ?? []
+            }
+
+            private static func timestampIsEarlier(_ lhs: String, _ rhs: String) -> Bool {
+                if let lhsDate = CostUsageScanner.dateFromTimestamp(lhs),
+                   let rhsDate = CostUsageScanner.dateFromTimestamp(rhs)
+                {
+                    return lhsDate < rhsDate
+                }
+                return lhs < rhs
+            }
+
             var firstTimestamp: String? {
-                self.indexedEvents?.first?.timestamp ?? self.snapshots?.first?.timestamp
+                self.timestamps.min(by: Self.timestampIsEarlier)
             }
 
             var lastTimestamp: String? {
-                self.indexedEvents?.last?.timestamp ?? self.snapshots?.last?.timestamp
+                self.timestamps.max(by: Self.timestampIsEarlier)
             }
 
             var hasSnapshotSource: Bool {
@@ -1735,6 +1748,16 @@ enum CostUsageScanner {
                 return timestamp <= cutoffTimestamp
             }
 
+            func isLater(_ timestamp: String, than selectedTimestamp: String?) -> Bool {
+                guard let selectedTimestamp else { return true }
+                if let date = CostUsageScanner.dateFromTimestamp(timestamp),
+                   let selectedDate = CostUsageScanner.dateFromTimestamp(selectedTimestamp)
+                {
+                    return date > selectedDate
+                }
+                return timestamp > selectedTimestamp
+            }
+
             if let events = resolution.indexedEvents {
                 var selectedCheckpoint: CostUsageCodexTokenCheckpoint?
                 let checkpointsAreSearchable = resolution.checkpoints.enumerated().allSatisfy { index, checkpoint in
@@ -1744,31 +1767,28 @@ enum CostUsageScanner {
                         && (index == 0
                             || resolution.checkpoints[index - 1].eventIndex < checkpoint.eventIndex)
                 }
-                let checkpoints = checkpointsAreSearchable ? resolution.checkpoints : []
-                if resolution.indexedTimestampsMonotonic {
-                    var lowerBound = 0
-                    var upperBound = checkpoints.count
-                    while lowerBound < upperBound {
-                        let middle = lowerBound + (upperBound - lowerBound) / 2
-                        if isAtOrBefore(checkpoints[middle].timestamp) {
-                            lowerBound = middle + 1
-                        } else {
-                            upperBound = middle
-                        }
+                let checkpoints = checkpointsAreSearchable && resolution.indexedTimestampsMonotonic
+                    ? resolution.checkpoints
+                    : []
+                var lowerBound = 0
+                var upperBound = checkpoints.count
+                while lowerBound < upperBound {
+                    let middle = lowerBound + (upperBound - lowerBound) / 2
+                    if isAtOrBefore(checkpoints[middle].timestamp) {
+                        lowerBound = middle + 1
+                    } else {
+                        upperBound = middle
                     }
-                    if lowerBound > 0 {
-                        selectedCheckpoint = checkpoints[lowerBound - 1]
-                    }
-                } else {
-                    for checkpoint in checkpoints where isAtOrBefore(checkpoint.timestamp) {
-                        selectedCheckpoint = checkpoint
-                    }
+                }
+                if lowerBound > 0 {
+                    selectedCheckpoint = checkpoints[lowerBound - 1]
                 }
 
                 var accumulator = CodexSnapshotAccumulator(state: selectedCheckpoint?.state)
                 var inherited = selectedCheckpoint.flatMap { checkpoint in
                     events[checkpoint.eventIndex].total ?? checkpoint.state.countedTotals
                 }
+                var inheritedTimestamp = selectedCheckpoint?.timestamp
                 let startIndex = min(events.count, (selectedCheckpoint?.eventIndex ?? -1) + 1)
                 for event in events[startIndex...] {
                     let eventIsAtOrBefore = isAtOrBefore(event.timestamp)
@@ -1776,19 +1796,25 @@ enum CostUsageScanner {
                         break
                     }
                     let counted = accumulator.apply(last: event.last, total: event.total)
-                    if eventIsAtOrBefore {
+                    if eventIsAtOrBefore, isLater(event.timestamp, than: inheritedTimestamp) {
                         // Forked children inherit the parent's raw cumulative counter, including
                         // any prefix that parent inherited from its own ancestors. Returning only
                         // the parent's owned/countable suffix rebills that ancestral context.
                         inherited = event.total ?? counted
+                        inheritedTimestamp = event.timestamp
                     }
                 }
                 return inherited
             }
 
             var inherited: CostUsageCodexTotals?
-            for snapshot in resolution.snapshots ?? [] where isAtOrBefore(snapshot.timestamp, date: snapshot.date) {
+            var inheritedTimestamp: String?
+            for snapshot in resolution.snapshots ?? []
+                where isAtOrBefore(snapshot.timestamp, date: snapshot.date)
+                && isLater(snapshot.timestamp, than: inheritedTimestamp)
+            {
                 inherited = snapshot.totals
+                inheritedTimestamp = snapshot.timestamp
             }
             return inherited
         }
@@ -4502,7 +4528,7 @@ enum CostUsageScanner {
         /// empty intermediary or a later page whose first snapshot is after the fork. In these proven
         /// shapes the first `total - last` is the locally copied prefix; using an absent parent
         /// baseline would bill it again. Ordinary forks with a usable parent snapshot retain #1164.
-        func raiseInheritedBaselineIfContinuedCounter(
+        func applyLocalInheritedBaselineIfNeeded(
             total: CostUsageCodexTotals,
             last: CostUsageCodexTotals)
         {
@@ -4513,18 +4539,8 @@ enum CostUsageScanner {
             guard isProvenContinuation || usesLocalInheritedBaseline else { return }
             guard Self.codexTotalsAtLeast(total, last) else { return }
             let localInherited = Self.codexTotalDelta(from: last, to: total)
-            guard localInherited.input > 0 || localInherited.cached > 0 || localInherited.output > 0 else {
-                return
-            }
-            if let currentInherited = inheritedTotals {
-                guard Self.codexTotalsAtLeast(localInherited, currentInherited),
-                      !Self.codexTotalsEqual(localInherited, currentInherited)
-                else { return }
-            } else {
-                guard usesLocalInheritedBaseline else { return }
-            }
             self.log.debug(
-                "Codex cost usage raised inherited fork baseline from first total-last",
+                "Codex cost usage applied inherited fork baseline from first total-last",
                 metadata: [
                     "sessionId": sessionId ?? "unknown",
                     "forkedFromId": forkedFromId ?? "unknown",
@@ -4599,7 +4615,7 @@ enum CostUsageScanner {
             // best-effort `last` rows here can replay billions of copied-prefix tokens.
             guard !hasUnresolvedForkBaseline else { return }
             if let total, let last {
-                raiseInheritedBaselineIfContinuedCounter(total: total, last: last)
+                applyLocalInheritedBaselineIfNeeded(total: total, last: last)
             }
 
             var deltaInput = 0

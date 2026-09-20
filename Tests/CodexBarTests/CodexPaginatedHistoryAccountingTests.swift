@@ -65,6 +65,53 @@ struct CodexPaginatedHistoryAccountingTests {
     }
 
     @Test
+    func `paginated continuation can replace an unrelated parent baseline with zero`() throws {
+        let env = try CostUsageTestEnvironment()
+        defer { env.cleanup() }
+
+        let day = try env.makeLocalNoon(year: 2026, month: 9, day: 16)
+        let timestamp = env.isoString(for: day)
+        let model = "openai/gpt-5.4"
+        let fileURL = try env.writeCodexSessionFile(
+            day: day,
+            filename: "rollout-\(timestamp)-thread-session_page-two.jsonl",
+            contents: env.jsonl([
+                [
+                    "type": "session_meta",
+                    "timestamp": timestamp,
+                    "payload": [
+                        "id": "thread-session",
+                        "forked_from_id": "original-ancestor",
+                        "timestamp": timestamp,
+                        "history_mode": "paginated",
+                        "history_base": [
+                            "thread_id": "thread-session",
+                            "end_ordinal_exclusive": 10,
+                            "end_byte_offset": 1000,
+                        ],
+                    ],
+                ],
+                self.turnContext(timestamp: timestamp, model: model),
+                self.tokenCount(
+                    timestamp: env.isoString(for: day.addingTimeInterval(1)),
+                    model: model,
+                    total: (input: 100, cached: 80, output: 10),
+                    last: (input: 100, cached: 80, output: 10)),
+            ]))
+
+        let parsed = CostUsageScanner.parseCodexFile(
+            fileURL: fileURL,
+            range: CostUsageScanner.CostUsageDayRange(since: day, until: day),
+            inheritedTotalsResolver: { _, _ in
+                .resolved(.init(input: 50, cached: 40, output: 5))
+            })
+        let dayKey = CostUsageScanner.CostUsageDayRange.dayKey(from: day)
+        let normalized = CostUsagePricing.normalizeCodexModel(model)
+
+        #expect(parsed.days[dayKey]?[normalized] == [100, 80, 10])
+    }
+
+    @Test
     func `true fork still subtracts the parent snapshot when first total-last matches it`() throws {
         let env = try CostUsageTestEnvironment()
         defer { env.cleanup() }
@@ -302,6 +349,79 @@ struct CodexPaginatedHistoryAccountingTests {
         let dayKey = CostUsageScanner.CostUsageDayRange.dayKey(from: day)
         let normalized = CostUsagePricing.normalizeCodexModel(model)
         #expect(parsed.days[dayKey]?[normalized] == [200, 40, 20])
+    }
+
+    @Test
+    func `direct fork selects the latest parent snapshot by timestamp`() throws {
+        let env = try CostUsageTestEnvironment()
+        defer { env.cleanup() }
+
+        let day = try env.makeLocalNoon(year: 2026, month: 9, day: 16)
+        let timestamp = env.isoString(for: day)
+        let model = "openai/gpt-5.4"
+        let parent = try env.writeCodexSessionFile(
+            day: day,
+            filename: "rollout-\(timestamp)-parent-session.jsonl",
+            contents: env.jsonl([
+                [
+                    "type": "session_meta",
+                    "timestamp": timestamp,
+                    "payload": ["id": "parent-session", "timestamp": timestamp],
+                ],
+                self.tokenCount(
+                    timestamp: env.isoString(for: day.addingTimeInterval(10)),
+                    model: model,
+                    total: (input: 100, cached: 80, output: 10),
+                    last: (input: 100, cached: 80, output: 10)),
+                self.tokenCount(
+                    timestamp: env.isoString(for: day.addingTimeInterval(12)),
+                    model: model,
+                    total: (input: 200, cached: 160, output: 20),
+                    last: (input: 100, cached: 80, output: 10)),
+                self.tokenCount(
+                    timestamp: env.isoString(for: day.addingTimeInterval(9)),
+                    model: model,
+                    total: (input: 90, cached: 70, output: 9),
+                    last: (input: 90, cached: 70, output: 9)),
+            ]))
+        let childStarted = env.isoString(for: day.addingTimeInterval(11))
+        let child = try env.writeCodexSessionFile(
+            day: day,
+            filename: "rollout-\(timestamp)-child-session.jsonl",
+            contents: env.jsonl([
+                [
+                    "type": "session_meta",
+                    "timestamp": childStarted,
+                    "payload": [
+                        "id": "child-session",
+                        "forked_from_id": "parent-session",
+                        "timestamp": childStarted,
+                    ],
+                ],
+                self.turnContext(timestamp: childStarted, model: model),
+                self.tokenCount(
+                    timestamp: env.isoString(for: day.addingTimeInterval(13)),
+                    model: model,
+                    total: (input: 150, cached: 120, output: 15),
+                    last: (input: 50, cached: 40, output: 5)),
+            ]))
+
+        let index = CostUsageScanner.CodexSessionFileIndex(
+            files: [parent],
+            roots: [env.codexSessionsRoot])
+        let resolver = CostUsageScanner.CodexInheritedTotalsResolver(
+            fileIndex: index,
+            checkCancellation: nil)
+        let parsed = CostUsageScanner.parseCodexFile(
+            fileURL: child,
+            range: CostUsageScanner.CostUsageDayRange(since: day, until: day),
+            inheritedTotalsResolver: { sessionID, cutoff in
+                try! resolver.inheritedTotals(for: sessionID, atOrBefore: cutoff)
+            })
+        let dayKey = CostUsageScanner.CostUsageDayRange.dayKey(from: day)
+        let normalized = CostUsagePricing.normalizeCodexModel(model)
+
+        #expect(parsed.days[dayKey]?[normalized] == [50, 40, 5])
     }
 
     @Test
