@@ -304,6 +304,85 @@ struct CodexPaginatedHistoryAccountingTests {
         #expect(parsed.days[dayKey]?[normalized] == [200, 40, 20])
     }
 
+    @Test
+    func `direct fork chains inherit raw cumulative totals through empty intermediaries`() throws {
+        let env = try CostUsageTestEnvironment()
+        defer { env.cleanup() }
+
+        let day = try env.makeLocalNoon(year: 2026, month: 9, day: 16)
+        let timestamp = env.isoString(for: day)
+        let model = "openai/gpt-5.4"
+        let emptyParentID = "empty-parent"
+        let firstChildID = "first-child"
+
+        _ = try env.writeCodexSessionFile(
+            day: day,
+            filename: "rollout-\(timestamp)-\(emptyParentID).jsonl",
+            contents: env.jsonl([[
+                "type": "session_meta",
+                "timestamp": timestamp,
+                "payload": ["id": emptyParentID, "timestamp": timestamp],
+            ]]))
+
+        let firstChildStarted = env.isoString(for: day.addingTimeInterval(1))
+        _ = try env.writeCodexSessionFile(
+            day: day,
+            filename: "rollout-\(timestamp)-\(firstChildID).jsonl",
+            contents: env.jsonl([
+                [
+                    "type": "session_meta",
+                    "timestamp": firstChildStarted,
+                    "payload": [
+                        "id": firstChildID,
+                        "forked_from_id": emptyParentID,
+                        "timestamp": firstChildStarted,
+                    ],
+                ],
+                self.turnContext(timestamp: firstChildStarted, model: model),
+                self.tokenCount(
+                    timestamp: env.isoString(for: day.addingTimeInterval(2)),
+                    model: model,
+                    total: (input: 1000, cached: 800, output: 100),
+                    last: (input: 100, cached: 80, output: 10)),
+            ]))
+
+        let secondChildStarted = env.isoString(for: day.addingTimeInterval(3))
+        _ = try env.writeCodexSessionFile(
+            day: day,
+            filename: "rollout-\(timestamp)-second-child.jsonl",
+            contents: env.jsonl([
+                [
+                    "type": "session_meta",
+                    "timestamp": secondChildStarted,
+                    "payload": [
+                        "id": "second-child",
+                        "forked_from_id": firstChildID,
+                        "timestamp": secondChildStarted,
+                    ],
+                ],
+                self.turnContext(timestamp: secondChildStarted, model: model),
+                self.tokenCount(
+                    timestamp: env.isoString(for: day.addingTimeInterval(4)),
+                    model: model,
+                    total: (input: 1250, cached: 900, output: 125),
+                    last: (input: 250, cached: 100, output: 25)),
+            ]))
+
+        var options = CostUsageScanner.Options(
+            codexSessionsRoot: env.codexSessionsRoot,
+            claudeProjectsRoots: nil,
+            cacheRoot: env.cacheRoot,
+            codexTraceDatabaseURL: env.root.appendingPathComponent("missing-traces.sqlite"))
+        options.refreshMinIntervalSeconds = 0
+        let report = CostUsageScanner.loadDailyReport(
+            provider: .codex,
+            since: day,
+            until: day,
+            now: day,
+            options: options)
+        #expect(self.inputTokens(report) == 350)
+    }
+
     @Test(arguments: [false, true], [false, true])
     func `paginated pages of the same thread do not double-count lifetime totals`(
         bounded: Bool,
