@@ -273,8 +273,9 @@ enabled Grok subscription is counted instead of omitted. When `updates.jsonl`
 contains a `turn_completed` usage record, that turn's input, output, and cache
 tokens replace the session's context-size signal. Turns outside the requested
 history window are dropped. The rest are priced at xAI's public
-list rate (`grok-4.6-build` uses the `grok-4.6` list price only when the catalog
-has no exact row). The dollar figure is an API-equivalent estimate, not a SuperGrok
+list rate (`grok-4.6-build` uses the `grok-4.6` list price only when neither the
+catalog nor custom pricing lists `grok-4.6-build` itself). Custom pricing rates
+apply even before the price catalog has downloaded. The dollar figure is an API-equivalent estimate, not a SuperGrok
 bill. A turn whose model has no list price keeps its tokens and omits the
 dollars. Sessions with only `signals.json` stay token counts. SuperGrok/X
 Premium+ credits remain a quota window on the usage bar; they are never

@@ -122,7 +122,11 @@ struct GrokLocalSessionScannerTests {
             model: "grok-4.6",
             date: when)
         let usage = """
-        {"timestamp":1787079600,"method":"_x.ai/session/update","params":{"update":{"sessionUpdate":"turn_completed","prompt_id":"p1","usage":{"inputTokens":1000,"outputTokens":50,"totalTokens":1050,"cachedReadTokens":200,"cacheCreationTokens":0,"reasoningTokens":10,"modelUsage":{"grok-4.6-build":{"inputTokens":1000,"outputTokens":50,"totalTokens":1050,"cachedReadTokens":200,"cacheCreationTokens":0,"reasoningTokens":10}}}}}}
+        {"timestamp":1787079600,"method":"_x.ai/session/update",\
+        "params":{"update":{"sessionUpdate":"turn_completed","prompt_id":"p1","usage":{"inputTokens":1000,\
+        "outputTokens":50,"totalTokens":1050,"cachedReadTokens":200,"cacheCreationTokens":0,\
+        "reasoningTokens":10,"modelUsage":{"grok-4.6-build":{"inputTokens":1000,"outputTokens":50,\
+        "totalTokens":1050,"cachedReadTokens":200,"cacheCreationTokens":0,"reasoningTokens":10}}}}}}
         """
         try usage.write(to: session.appendingPathComponent("updates.jsonl"), atomically: true, encoding: .utf8)
         try FileManager.default.setAttributes(
@@ -153,8 +157,16 @@ struct GrokLocalSessionScannerTests {
         let when = Date(timeIntervalSince1970: 1_787_079_600)
         let old = 1_787_079_600 - (40 * 24 * 60 * 60)
         let usage = """
-        {"timestamp":\(old),"method":"_x.ai/session/update","params":{"update":{"sessionUpdate":"turn_completed","prompt_id":"old","usage":{"inputTokens":400,"outputTokens":100,"totalTokens":500,"cachedReadTokens":0,"cacheCreationTokens":0,"modelUsage":{"grok-4.6":{"inputTokens":400,"outputTokens":100,"totalTokens":500,"cachedReadTokens":0,"cacheCreationTokens":0}}}}}}
-        {"timestamp":1787079600,"method":"_x.ai/session/update","params":{"update":{"sessionUpdate":"turn_completed","prompt_id":"new","usage":{"inputTokens":1000,"outputTokens":50,"totalTokens":1050,"cachedReadTokens":200,"cacheCreationTokens":0,"modelUsage":{"grok-4.6-build":{"inputTokens":1000,"outputTokens":50,"totalTokens":1050,"cachedReadTokens":200,"cacheCreationTokens":0}}}}}}
+        {"timestamp":\(old),"method":"_x.ai/session/update",\
+        "params":{"update":{"sessionUpdate":"turn_completed","prompt_id":"old","usage":{"inputTokens":400,\
+        "outputTokens":100,"totalTokens":500,"cachedReadTokens":0,"cacheCreationTokens":0,\
+        "modelUsage":{"grok-4.6":{"inputTokens":400,"outputTokens":100,"totalTokens":500,\
+        "cachedReadTokens":0,"cacheCreationTokens":0}}}}}}
+        {"timestamp":1787079600,"method":"_x.ai/session/update",\
+        "params":{"update":{"sessionUpdate":"turn_completed","prompt_id":"new","usage":{"inputTokens":1000,\
+        "outputTokens":50,"totalTokens":1050,"cachedReadTokens":200,"cacheCreationTokens":0,\
+        "modelUsage":{"grok-4.6-build":{"inputTokens":1000,"outputTokens":50,"totalTokens":1050,\
+        "cachedReadTokens":200,"cacheCreationTokens":0}}}}}}
         """
         let updates = session.appendingPathComponent("updates.jsonl")
         try usage.write(to: updates, atomically: true, encoding: .utf8)

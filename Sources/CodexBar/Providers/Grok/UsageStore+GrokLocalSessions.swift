@@ -22,20 +22,23 @@ extension UsageStore {
         guard !daily.isEmpty else { return nil }
         let tokens = daily.compactMap(\.totalTokens)
         let requests = daily.compactMap(\.requestCount)
+        // Dollars follow the filtered days; one unpriced day with tokens leaves the window unknown.
+        let costs = daily.compactMap(\.costUSD)
+        let priced = !costs.isEmpty && daily.allSatisfy { ($0.totalTokens ?? 0) == 0 || $0.costUSD != nil }
 
         return CostUsageTokenSnapshot(
             sessionTokens: published.sessionTokens,
             sessionCostUSD: published.sessionCostUSD,
             sessionRequests: published.sessionRequests,
             last30DaysTokens: tokens.isEmpty ? nil : tokens.reduce(0, +),
-            last30DaysCostUSD: published.last30DaysCostUSD,
+            last30DaysCostUSD: priced ? costs.reduce(0, +) : nil,
             last30DaysRequests: requests.isEmpty ? nil : requests.reduce(0, +),
             currencyCode: published.currencyCode,
             historyDays: days,
             historyCoverageIsEstablished: published.historyCoverageIsEstablished && published.historyDays >= days,
             historyLabel: published.historyLabel,
             meteredCostUSD: published.meteredCostUSD,
-            costProvenance: published.costProvenance,
+            costProvenance: priced ? .listPriceEstimate : .unknown,
             credentialScopeFingerprint: published.credentialScopeFingerprint,
             daily: daily,
             projects: published.projects,

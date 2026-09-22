@@ -5,42 +5,46 @@ import Foundation
 /// Cache counters are subsets of input, matching Muse and Grok turn logs. A consumed cache class
 /// with no catalog rate stays unpriced. Reasoning tokens are not added; they are already inside output.
 enum SubscriptionListPrice {
+    struct Usage: Equatable {
+        let inputTokens: Int
+        let outputTokens: Int
+        let cacheReadTokens: Int
+        let cacheCreationTokens: Int
+
+        var uncachedInputTokens: Int? {
+            guard self.inputTokens >= 0, self.outputTokens >= 0,
+                  self.cacheReadTokens >= 0, self.cacheCreationTokens >= 0,
+                  self.cacheReadTokens <= self.inputTokens, self.cacheCreationTokens <= self.inputTokens
+            else { return nil }
+            let uncached = self.inputTokens - self.cacheReadTokens - self.cacheCreationTokens
+            return uncached >= 0 ? uncached : nil
+        }
+    }
+
+    /// Custom rates apply without a catalog, so a fresh or offline install still prices configured models.
     static func estimateUSD(
         providerID: String,
         modelID: String,
-        inputTokens: Int,
-        outputTokens: Int,
-        cacheReadTokens: Int,
-        cacheCreationTokens: Int,
-        catalog: ModelsDevCatalog,
+        usage: Usage,
+        catalog: ModelsDevCatalog?,
         customPricing: CostUsageCustomPricing = .empty) -> Double?
     {
-        guard inputTokens >= 0, outputTokens >= 0, cacheReadTokens >= 0, cacheCreationTokens >= 0,
-              cacheReadTokens <= inputTokens, cacheCreationTokens <= inputTokens
-        else { return nil }
-        let uncached = inputTokens - cacheReadTokens - cacheCreationTokens
-        guard uncached >= 0 else { return nil }
+        guard usage.uncachedInputTokens != nil else { return nil }
         let candidates = self.modelIDs(providerID: providerID, modelID: modelID)
         guard let exact = candidates.first else { return nil }
         if let cost = self.price(
             providerID: providerID,
             modelID: exact,
-            uncachedInput: uncached,
-            outputTokens: outputTokens,
-            cacheReadTokens: cacheReadTokens,
-            cacheCreationTokens: cacheCreationTokens,
+            usage: usage,
             catalog: catalog,
             customPricing: customPricing)
         {
             return cost
         }
-        // An exact row that cannot price a consumed class stays unknown. Aliases apply only
-        // when that exact row is absent.
-        if self.hasPricingRow(
-            providerID: providerID,
-            modelID: exact,
-            catalog: catalog,
-            customPricing: customPricing)
+        // An exact row that exists stays unknown when it cannot price the usage, even with no cost at all.
+        // Aliases apply only when that exact row is absent.
+        if customPricing.rates(providerID: providerID, model: exact) != nil
+            || self.listsModel(providerID: providerID, modelID: exact, catalog: catalog)
         {
             return nil
         }
@@ -48,10 +52,7 @@ enum SubscriptionListPrice {
             if let cost = self.price(
                 providerID: providerID,
                 modelID: alias,
-                uncachedInput: uncached,
-                outputTokens: outputTokens,
-                cacheReadTokens: cacheReadTokens,
-                cacheCreationTokens: cacheCreationTokens,
+                usage: usage,
                 catalog: catalog,
                 customPricing: customPricing)
             {
@@ -66,43 +67,40 @@ enum SubscriptionListPrice {
     private static func price(
         providerID: String,
         modelID: String,
-        uncachedInput: Int,
-        outputTokens: Int,
-        cacheReadTokens: Int,
-        cacheCreationTokens: Int,
-        catalog: ModelsDevCatalog,
+        usage: Usage,
+        catalog: ModelsDevCatalog?,
         customPricing: CostUsageCustomPricing) -> Double?
     {
+        guard let uncached = usage.uncachedInputTokens else { return nil }
         if let rates = customPricing.rates(providerID: providerID, model: modelID) {
             return self.finite(CostUsageCustomPricing.costUSD(
                 rates: rates,
-                inputTokens: uncachedInput,
-                outputTokens: outputTokens,
-                cacheReadTokens: cacheReadTokens,
-                cacheWriteTokens: cacheCreationTokens))
+                inputTokens: uncached,
+                outputTokens: usage.outputTokens,
+                cacheReadTokens: usage.cacheReadTokens,
+                cacheWriteTokens: usage.cacheCreationTokens))
         }
+        guard let catalog else { return nil }
         return self.finite(CostUsagePricing.providerCostUSD(
             providerID: providerID,
             model: modelID,
-            inputTokens: uncachedInput,
-            cachedInputTokens: cacheReadTokens,
-            cacheWriteInputTokens: cacheCreationTokens,
-            outputTokens: outputTokens,
+            inputTokens: uncached,
+            cachedInputTokens: usage.cacheReadTokens,
+            cacheWriteInputTokens: usage.cacheCreationTokens,
+            outputTokens: usage.outputTokens,
             pricingDate: nil,
             catalog: catalog,
             customPricing: .empty))
     }
 
-    private static func hasPricingRow(
-        providerID: String,
-        modelID: String,
-        catalog: ModelsDevCatalog,
-        customPricing: CostUsageCustomPricing) -> Bool
-    {
-        if customPricing.rates(providerID: providerID, model: modelID) != nil {
-            return true
+    /// Model identity only: a listed row with missing input or output prices still counts as present.
+    private static func listsModel(providerID: String, modelID: String, catalog: ModelsDevCatalog?) -> Bool {
+        guard let provider = catalog?.providers[ModelsDevProvider.normalizeProviderID(providerID)] else {
+            return false
         }
-        return catalog.pricing(providerID: providerID, modelID: modelID, exactModelID: true) != nil
+        let normalized = ModelsDevModelIDNormalizer.normalize(modelID)
+        return provider.models[normalized] != nil
+            || provider.models.values.contains { $0.normalizedID == normalized }
     }
 
     private static func finite(_ cost: Double?) -> Double? {
@@ -123,5 +121,43 @@ enum SubscriptionListPrice {
             }
         }
         return ids
+    }
+}
+
+/// Pricing-refresh controls that `CostUsageFetcher.loadTokenSnapshot` forwards to local subscription readers.
+struct SubscriptionPricingControls: Sendable {
+    var allowRefresh = true
+    var refreshInBackground = true
+    var retryUnknown = true
+    var cacheRoot: URL?
+    var client = ModelsDevClient()
+
+    /// Refreshes a stale catalog when allowed, waiting only when nothing is cached yet.
+    func catalog(now: Date) async -> ModelsDevCatalog? {
+        if self.allowRefresh, self.retryUnknown {
+            let cacheRoot = self.cacheRoot
+            let client = self.client
+            if !self.refreshInBackground || CostUsagePricing.modelsDevCatalog(now: now, cacheRoot: cacheRoot) == nil {
+                await ModelsDevPricingPipeline.refreshIfNeeded(now: now, cacheRoot: cacheRoot, client: client)
+            } else {
+                Task.detached(priority: .utility) {
+                    await ModelsDevPricingPipeline.refreshIfNeeded(now: now, cacheRoot: cacheRoot, client: client)
+                }
+            }
+        }
+        return CostUsagePricing.modelsDevCatalog(now: now, cacheRoot: self.cacheRoot)
+    }
+
+    /// A refreshed catalog when unpriced models gained prices; nil when a rescan would not change anything.
+    func catalog(pricing modelIDs: Set<String>, providerID: String, now: Date) async -> ModelsDevCatalog? {
+        guard self.allowRefresh, self.retryUnknown, !modelIDs.isEmpty else { return nil }
+        let outcome = await ModelsDevPricingPipeline.refreshForUnknownModelsIfNeeded(
+            providerID: providerID,
+            modelIDs: modelIDs,
+            now: now,
+            cacheRoot: self.cacheRoot,
+            client: self.client)
+        guard outcome == .pricingAvailable else { return nil }
+        return CostUsagePricing.modelsDevCatalog(now: now, cacheRoot: self.cacheRoot)
     }
 }

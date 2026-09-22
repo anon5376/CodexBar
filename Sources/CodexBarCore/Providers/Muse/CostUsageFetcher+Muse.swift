@@ -1,37 +1,43 @@
 import Foundation
 
 extension CostUsageFetcher {
+    private struct MuseScan {
+        let context: MuseLocalUsageReader.Context
+        let calendar: Calendar
+        let sinceKey: String
+        let untilKey: String
+        let cacheRoot: URL
+        let customPricing: CostUsageCustomPricing
+    }
+
     static func loadMuseLocalSnapshot(
         environment: [String: String],
         now: Date,
         historyDays: Int,
         options: CostUsageScanner.Options,
-        allowPricingRefresh: Bool = true,
-        refreshPricingInBackground: Bool = true,
-        retryUnknownPricing: Bool = true,
-        modelsDevClient: ModelsDevClient = ModelsDevClient()) async throws -> CostUsageTokenSnapshot
+        pricing: SubscriptionPricingControls = .init()) async throws -> CostUsageTokenSnapshot
     {
         let context = MuseLocalUsageReader.Context(environment: environment)
         let calendar = options.calendar
         let since = calendar.date(
             byAdding: .day, value: -(historyDays - 1), to: calendar.startOfDay(for: now)) ?? now
-        let sinceKey = CostUsageLocalDay.key(from: since, calendar: calendar)
-        let untilKey = CostUsageLocalDay.key(from: now, calendar: calendar)
         let cacheRoot = options.cacheRoot ?? context.defaultCacheRoot
-        let customPricing = CostUsageCustomPricing.load(environment: environment)
-        let result = try await self.museReport(
+        let scan = MuseScan(
             context: context,
             calendar: calendar,
-            sinceKey: sinceKey,
-            untilKey: untilKey,
+            sinceKey: CostUsageLocalDay.key(from: since, calendar: calendar),
+            untilKey: CostUsageLocalDay.key(from: now, calendar: calendar),
             cacheRoot: cacheRoot,
+            customPricing: CostUsageCustomPricing.load(environment: environment))
+        var pricing = pricing
+        if pricing.cacheRoot == nil {
+            pricing.cacheRoot = cacheRoot
+        }
+        let result = try await self.museReport(
+            scan,
             forceRescan: options.forceRescan,
-            customPricing: customPricing,
-            now: now,
-            allowPricingRefresh: allowPricingRefresh,
-            refreshPricingInBackground: refreshPricingInBackground,
-            retryUnknownPricing: retryUnknownPricing,
-            modelsDevClient: modelsDevClient)
+            pricing: pricing,
+            now: now)
         let days = result.report.data
         let priced = days.contains { $0.costUSD != nil }
             && days.allSatisfy { ($0.totalTokens ?? 0) == 0 || $0.costUSD != nil }
@@ -46,86 +52,37 @@ extension CostUsageFetcher {
     }
 
     private static func museReport(
-        context: MuseLocalUsageReader.Context,
-        calendar: Calendar,
-        sinceKey: String,
-        untilKey: String,
-        cacheRoot: URL,
+        _ scan: MuseScan,
         forceRescan: Bool,
-        customPricing: CostUsageCustomPricing,
-        now: Date,
-        allowPricingRefresh: Bool,
-        refreshPricingInBackground: Bool,
-        retryUnknownPricing: Bool,
-        modelsDevClient: ModelsDevClient) async throws -> MuseLocalUsageReader.DailyReportResult
+        pricing: SubscriptionPricingControls,
+        now: Date) async throws -> MuseLocalUsageReader.DailyReportResult
     {
-        if allowPricingRefresh, retryUnknownPricing {
-            if CostUsagePricing.modelsDevCatalog(now: now, cacheRoot: cacheRoot) == nil
-                || !refreshPricingInBackground
-            {
-                await ModelsDevPricingPipeline.refreshIfNeeded(
-                    now: now, cacheRoot: cacheRoot, client: modelsDevClient)
-            } else {
-                Task.detached(priority: .utility) {
-                    await ModelsDevPricingPipeline.refreshIfNeeded(
-                        now: now, cacheRoot: cacheRoot, client: modelsDevClient)
-                }
-            }
-        }
-        var catalog = CostUsagePricing.modelsDevCatalog(now: now, cacheRoot: cacheRoot)
-        var report = try await self.scanMuse(
-            context: context,
-            calendar: calendar,
-            sinceKey: sinceKey,
-            untilKey: untilKey,
-            cacheRoot: cacheRoot,
-            forceRescan: forceRescan,
-            catalog: catalog,
-            customPricing: customPricing)
-        guard allowPricingRefresh, retryUnknownPricing else { return report }
-        let unknown = self.unpricedMuseModels(in: report)
-        guard !unknown.isEmpty else { return report }
-        let outcome = await ModelsDevPricingPipeline.refreshForUnknownModelsIfNeeded(
+        let catalog = await pricing.catalog(now: now)
+        let report = try await self.scanMuse(scan, forceRescan: forceRescan, catalog: catalog)
+        guard let refreshed = await pricing.catalog(
+            pricing: self.unpricedMuseModels(in: report),
             providerID: "meta",
-            modelIDs: unknown,
-            now: now,
-            cacheRoot: cacheRoot,
-            client: modelsDevClient)
-        guard outcome == .pricingAvailable else { return report }
-        catalog = CostUsagePricing.modelsDevCatalog(now: now, cacheRoot: cacheRoot)
-        report = try await self.scanMuse(
-            context: context,
-            calendar: calendar,
-            sinceKey: sinceKey,
-            untilKey: untilKey,
-            cacheRoot: cacheRoot,
-            forceRescan: true,
-            catalog: catalog,
-            customPricing: customPricing)
-        return report
+            now: now)
+        else { return report }
+        return try await self.scanMuse(scan, forceRescan: true, catalog: refreshed)
     }
 
     private static func scanMuse(
-        context: MuseLocalUsageReader.Context,
-        calendar: Calendar,
-        sinceKey: String,
-        untilKey: String,
-        cacheRoot: URL,
+        _ scan: MuseScan,
         forceRescan: Bool,
-        catalog: ModelsDevCatalog?,
-        customPricing: CostUsageCustomPricing) async throws -> MuseLocalUsageReader.DailyReportResult
+        catalog: ModelsDevCatalog?) async throws -> MuseLocalUsageReader.DailyReportResult
     {
         try await CostUsageScanExecutor.run { cancellation in
             try MuseLocalUsageReader.makeDailyReportWithStatus(
-                context: context,
-                calendar: calendar,
-                sinceDayKey: sinceKey,
-                untilDayKey: untilKey,
-                cacheRoot: cacheRoot,
+                context: scan.context,
+                calendar: scan.calendar,
+                sinceDayKey: scan.sinceKey,
+                untilDayKey: scan.untilKey,
+                cacheRoot: scan.cacheRoot,
                 forceRescan: forceRescan,
                 estimateCost: true,
                 pricingCatalog: catalog,
-                customPricing: customPricing,
+                customPricing: scan.customPricing,
                 checkCancellation: cancellation)
         }
     }

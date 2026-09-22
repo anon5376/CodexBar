@@ -74,6 +74,40 @@ struct GrokTokenSnapshotProjectionTests {
     }
 
     @Test
+    func `grok projection recomputes dollars from the narrowed days`() throws {
+        let calendar = Calendar.current
+        let now = Date(timeIntervalSince1970: 1_787_079_600)
+        let recent = try #require(calendar.date(byAdding: .day, value: -2, to: now))
+        let older = try #require(calendar.date(byAdding: .day, value: -12, to: now))
+        let unpricedOlder = try #require(calendar.date(byAdding: .day, value: -20, to: now))
+        // One unpriced older day leaves the published 30-day total unknown.
+        let published = Self.snapshot(
+            daily: [
+                Self.entry(date: Self.dayKey(unpricedOlder, calendar: calendar), tokens: 70),
+                Self.entry(date: Self.dayKey(older, calendar: calendar), tokens: 90, cost: 5),
+                Self.entry(date: Self.dayKey(recent, calendar: calendar), tokens: 40, cost: 1.25),
+                Self.entry(date: Self.dayKey(now, calendar: calendar), tokens: 10, cost: 0.5),
+            ],
+            updatedAt: now)
+        let store = Self.makeStore(environment: [:])
+        let providerSnapshot = UsageSnapshot(primary: nil, secondary: nil, costUsage: published, updatedAt: now)
+
+        let week = try #require(store.tokenSnapshot(
+            fromProviderSnapshot: providerSnapshot,
+            provider: .grok,
+            historyDays: 7))
+        #expect(week.last30DaysCostUSD == 1.75)
+        #expect(week.costProvenance == .listPriceEstimate)
+
+        let fortnight = try #require(store.tokenSnapshot(
+            fromProviderSnapshot: providerSnapshot,
+            provider: .grok,
+            historyDays: 25))
+        #expect(fortnight.last30DaysCostUSD == nil)
+        #expect(fortnight.costProvenance == .unknown)
+    }
+
+    @Test
     func `missing grok billing reuses only its already published fallback`() {
         let now = Date(timeIntervalSince1970: 1_787_079_600)
         let published = Self.snapshot(
@@ -140,14 +174,14 @@ struct GrokTokenSnapshotProjectionTests {
             updatedAt: updatedAt)
     }
 
-    private static func entry(date: String, tokens: Int) -> CostUsageDailyReport.Entry {
+    private static func entry(date: String, tokens: Int, cost: Double? = nil) -> CostUsageDailyReport.Entry {
         CostUsageDailyReport.Entry(
             date: date,
             inputTokens: nil,
             outputTokens: nil,
             totalTokens: tokens,
             requestCount: 1,
-            costUSD: nil,
+            costUSD: cost,
             modelsUsed: ["grok-4.6"],
             modelBreakdowns: nil)
     }

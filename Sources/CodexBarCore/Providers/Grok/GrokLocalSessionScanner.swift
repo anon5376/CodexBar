@@ -133,6 +133,7 @@ public enum GrokLocalSessionScanner {
             customPricing: .empty)
     }
 
+    // swiftlint:disable:next function_parameter_count
     static func summarize(
         env: [String: String],
         fileManager: FileManager,
@@ -222,36 +223,34 @@ public enum GrokLocalSessionScanner {
         lookbackDays: Int = defaultLookbackDays,
         now: Date = .init()) async throws -> GrokLocalSessionSummary
     {
-        if CostUsagePricing.modelsDevCatalog(now: now) == nil {
-            await ModelsDevPricingPipeline.refreshIfNeeded(now: now)
-        } else {
-            Task.detached(priority: .utility) {
-                await ModelsDevPricingPipeline.refreshIfNeeded(now: now)
-            }
-        }
+        try await self.summarizeOffMainThread(env: env, lookbackDays: lookbackDays, now: now, pricing: .init())
+    }
+
+    static func summarizeOffMainThread(
+        env: [String: String],
+        lookbackDays: Int,
+        now: Date,
+        pricing: SubscriptionPricingControls) async throws -> GrokLocalSessionSummary
+    {
         let customPricing = CostUsageCustomPricing.load(environment: env)
-        var catalog = CostUsagePricing.modelsDevCatalog(now: now)
-        var summary = try await self.scanSummary(
+        let catalog = await pricing.catalog(now: now)
+        let summary = try await self.scanSummary(
             env: env,
             lookbackDays: lookbackDays,
             now: now,
             catalog: catalog,
             customPricing: customPricing)
-        let unknown = self.unpricedModelIDs(in: summary)
-        guard !unknown.isEmpty else { return summary }
-        let outcome = await ModelsDevPricingPipeline.refreshForUnknownModelsIfNeeded(
+        guard let refreshed = await pricing.catalog(
+            pricing: self.unpricedModelIDs(in: summary),
             providerID: "xai",
-            modelIDs: unknown,
             now: now)
-        guard outcome == .pricingAvailable else { return summary }
-        catalog = CostUsagePricing.modelsDevCatalog(now: now)
-        summary = try await self.scanSummary(
+        else { return summary }
+        return try await self.scanSummary(
             env: env,
             lookbackDays: lookbackDays,
             now: now,
-            catalog: catalog,
+            catalog: refreshed,
             customPricing: customPricing)
-        return summary
     }
 
     private static func scanSummary(
@@ -451,7 +450,11 @@ public enum GrokLocalSessionScanner {
 
     private static func readTurns(url: URL, mtime: Date, into session: inout SessionScan) {
         guard let data = try? Data(contentsOf: url) else { return }
-        let text = String(decoding: data, as: UTF8.self)
+        // A log that is not UTF-8 falls back to the context signal instead of counting repaired text.
+        guard let text = String(bytes: data, encoding: .utf8) else {
+            session.turnParseFailed = true
+            return
+        }
         var seen: [String: Turn] = [:]
         for line in text.split(whereSeparator: \.isNewline) {
             let raw = String(line)
@@ -537,17 +540,16 @@ public enum GrokLocalSessionScanner {
             var last: Date?
             for turn in session.turns where turn.at >= lookbackCutoff {
                 guard let day = self.dayKey(for: turn.at, calendar: calendar) else { continue }
-                let cost = catalog.flatMap {
-                    SubscriptionListPrice.estimateUSD(
-                        providerID: "xai",
-                        modelID: turn.model,
+                let cost = SubscriptionListPrice.estimateUSD(
+                    providerID: "xai",
+                    modelID: turn.model,
+                    usage: .init(
                         inputTokens: turn.input,
                         outputTokens: turn.output,
                         cacheReadTokens: turn.cacheRead,
-                        cacheCreationTokens: turn.cacheWrite,
-                        catalog: $0,
-                        customPricing: customPricing)
-                }
+                        cacheCreationTokens: turn.cacheWrite),
+                    catalog: catalog,
+                    customPricing: customPricing)
                 pieces.append(Piece(
                     day: day,
                     at: turn.at,

@@ -589,12 +589,19 @@ public struct CostUsageFetcher: Sendable {
                 historyDays: clampedHistoryDays,
                 calendar: fallbackCalendar))
         }
+        let subscriptionPricing = SubscriptionPricingControls(
+            allowRefresh: allowPricingRefresh,
+            refreshInBackground: refreshPricingInBackground,
+            retryUnknown: retryUnknownPricing,
+            cacheRoot: overrideScannerOptions?.cacheRoot,
+            client: modelsDevClient)
         // Provider-specific by design: Grok prices recorded turns at xAI's public list rates.
         if provider == .grok {
             let summary = try await GrokLocalSessionScanner.summarizeOffMainThread(
                 env: environment,
                 lookbackDays: clampedHistoryDays,
-                now: now)
+                now: now,
+                pricing: subscriptionPricing)
             if let snapshot = summary.toCostUsageTokenSnapshot(historyDays: clampedHistoryDays) {
                 return CostUsageTokenResult(snapshot: snapshot)
             }
@@ -610,10 +617,7 @@ public struct CostUsageFetcher: Sendable {
                 now: now,
                 historyDays: clampedHistoryDays,
                 options: fallbackOptions,
-                allowPricingRefresh: allowPricingRefresh,
-                refreshPricingInBackground: refreshPricingInBackground,
-                retryUnknownPricing: retryUnknownPricing,
-                modelsDevClient: modelsDevClient))
+                pricing: subscriptionPricing))
         }
         if let remoteError {
             throw remoteError

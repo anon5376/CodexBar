@@ -195,6 +195,7 @@ enum MuseLocalUsageReader {
         let catalog = estimateCost
             ? (pricingCatalog ?? CostUsagePricing.modelsDevCatalog(cacheRoot: cacheRoot))
             : nil
+        let customPricing = estimateCost ? customPricing : .empty
         var cache = MuseLocalUsageCacheIO.load(
             sessionsRoot: context.sessionsRoot,
             cacheRoot: cacheRoot,
@@ -394,6 +395,8 @@ enum MuseLocalUsageReader {
         catalog: ModelsDevCatalog?,
         customPricing: CostUsageCustomPricing) -> CostUsageDailyReport.Entry
     {
+        // Custom rates price without a catalog, so a fresh or offline install still honors them.
+        let attempted = catalog != nil || !customPricing.entries.isEmpty
         var cost = 0.0
         var sawCost = false
         var everyModelPriced = true
@@ -401,17 +404,16 @@ enum MuseLocalUsageReader {
         var unpriced = 0
         let breakdowns = totals.modelUsage.keys.sorted().map { name in
             let usage = totals.modelUsage[name] ?? MuseLocalUsageCache.DayTotals.ModelUsage()
-            let modelCost = catalog.flatMap {
-                SubscriptionListPrice.estimateUSD(
-                    providerID: "meta",
-                    modelID: name,
+            let modelCost = attempted ? SubscriptionListPrice.estimateUSD(
+                providerID: "meta",
+                modelID: name,
+                usage: .init(
                     inputTokens: usage.inputTokens,
                     outputTokens: usage.outputTokens,
                     cacheReadTokens: usage.cacheReadTokens,
-                    cacheCreationTokens: usage.cacheWriteTokens,
-                    catalog: $0,
-                    customPricing: customPricing)
-            }
+                    cacheCreationTokens: usage.cacheWriteTokens),
+                catalog: catalog,
+                customPricing: customPricing) : nil
             if usage.totalTokens > 0 {
                 if let modelCost {
                     cost += modelCost
@@ -433,7 +435,6 @@ enum MuseLocalUsageReader {
                 cacheCreationTokens: usage.cacheWriteTokens)
         }
         let dayCost: Double? = everyModelPriced && sawCost ? cost : nil
-        let attempted = catalog != nil
         return CostUsageDailyReport.Entry(
             date: date,
             inputTokens: totals.inputTokens,

@@ -41,7 +41,7 @@ An active subscription whose mint response omits `subs_usage` or returns it as `
 
 ## Local token history
 
-Enable local usage tracking to show today's tokens, the API-equivalent dollar estimate, and recent daily history below the subscription windows. The command `codexbar cost --provider muse` reports both. JSON leaves monetary fields absent when a recorded model has no list price. Local history requires no provider request or credential access. Prices come from the cached models.dev catalog.
+Enable local usage tracking to show today's tokens, the API-equivalent dollar estimate, and recent daily history below the subscription windows. The command `codexbar cost --provider muse` reports both. JSON leaves monetary fields absent when a recorded model has no list price. Local history requires no provider request or credential access. Prices come from the cached models.dev catalog; custom pricing rates apply even before that catalog has downloaded.
 
 The reader uses `$MUSE_SESSIONS_DIR`, or `$XDG_DATA_HOME/muse/sessions` (default `~/.local/share/muse/sessions`). It reads `YYYY/MM/DD/session/session.jsonl` files and buckets turns by their recorded timestamp in the local calendar, including turns written after a session's directory date. This is machine-local history across the selected session tree, not an account billing statement or a quota estimate.
 
