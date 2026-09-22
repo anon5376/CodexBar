@@ -475,6 +475,7 @@ struct MuseLocalUsageReaderTests {
             let snapshot = try await CostUsageFetcher.loadTokenSnapshot(
                 provider: .muse, environment: ["HOME": root.path, "MUSE_SESSIONS_DIR": root.path],
                 now: Date(timeIntervalSince1970: Double(Self.baseMicros) / 1_000_000), historyDays: 1,
+                allowPricingRefresh: false,
                 scannerOptions: .init(cacheRoot: cache, calendar: calendar),
                 modelsDevClient: ModelsDevClient(transport: RejectMusePricingTransport()))
             #expect(snapshot.sessionTokens == (knownUsage ? 35122 : nil))
@@ -620,7 +621,7 @@ struct MuseLocalUsageReaderTests {
     }
 
     @Test(arguments: ["valid", "empty", "missing"])
-    func `local fetch and CLI preserve tokens and unavailable dollars without pricing requests`(
+    func `local fetch and CLI keep tokens without a price catalog or pricing requests`(
         source: String) async throws
     {
         let root = try Self.makeTree([(
@@ -636,6 +637,7 @@ struct MuseLocalUsageReaderTests {
             environment: ["HOME": root.path, "MUSE_SESSIONS_DIR": sessions.path],
             now: Date(timeIntervalSince1970: Double(Self.baseMicros) / 1_000_000),
             historyDays: 1,
+            allowPricingRefresh: false,
             scannerOptions: .init(cacheRoot: cache, calendar: calendar),
             modelsDevClient: ModelsDevClient(transport: RejectMusePricingTransport()))
         let expected: Int? = source == "valid" ? 35122 : source == "empty" ? 0 : nil
@@ -687,7 +689,7 @@ struct MuseLocalUsageReaderTests {
 
 private struct RejectMusePricingTransport: ModelsDevHTTPTransport {
     func data(for _: URLRequest) async throws -> (Data, URLResponse) {
-        Issue.record("Token-only Muse history must not fetch pricing or call a provider service")
+        Issue.record("Muse history must not fetch pricing when refresh is disabled")
         throw URLError(.unsupportedURL)
     }
 }

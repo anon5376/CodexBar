@@ -47,7 +47,8 @@ extension CostUsageFetcher {
             historyDays: historyDays,
             calendar: calendar,
             historyCoverageIsEstablished: result.isComplete && result.isAvailable,
-            monetaryValuesAreAvailable: true,
+            // Empty or wholly unpriced history stays dollar-free instead of reading as $0.
+            monetaryValuesAreAvailable: priced,
             costProvenance: priced ? .listPriceEstimate : .unknown)
     }
 
