@@ -114,6 +114,7 @@ enum SubscriptionListPrice {
         let trimmed = modelID.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return [] }
         var ids = [trimmed]
+        // Provider-specific by design: only Grok Build records a "-build" suffix on a public xAI model.
         if providerID == "xai", trimmed.hasSuffix("-build") {
             let stem = String(trimmed.dropLast("-build".count))
             if !stem.isEmpty, stem != trimmed {

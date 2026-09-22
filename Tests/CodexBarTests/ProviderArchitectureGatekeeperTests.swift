@@ -207,13 +207,13 @@ struct ProviderArchitectureGatekeeperTests {
         #expect(Set(descriptors.filter(\.tokenCost.preservesCalendarDaysInCharts).map(\.id))
             == [.codex, .antigravity])
         #if os(macOS)
-        // Antigravity and Muse use bounded local usage readers.
+        // Antigravity, Grok, and Muse use bounded local usage readers.
         #expect(Set(descriptors.filter(\.tokenCost.supportsTokenSnapshot).map(\.id)) == [
-            .codex, .claude, .cursor, .vertexai, .bedrock, .antigravity, .muse, .pi,
+            .codex, .claude, .cursor, .vertexai, .bedrock, .antigravity, .grok, .muse, .pi,
         ])
         #else
         #expect(Set(descriptors.filter(\.tokenCost.supportsTokenSnapshot).map(\.id)) == [
-            .codex, .claude, .vertexai, .bedrock, .antigravity, .muse, .pi,
+            .codex, .claude, .vertexai, .bedrock, .antigravity, .grok, .muse, .pi,
         ])
         #endif
         #expect(Set(descriptors.filter { $0.cli.binaryLocator != nil }.map(\.id)) == [
@@ -1404,25 +1404,25 @@ struct ProviderArchitectureGatekeeperTests {
             reason: "This provider-specific app branch passes its already-selected identity to a shared helper."),
         SuppressedProviderReference(
             path: "Sources/CodexBarCLI/CLICostCommand.swift",
-            line: 476,
+            line: 484,
             anchor: "lines.append(Self.costEstimateHint(provider: .codex))",
             expectedProviderIDs: ["codex"],
             reason: "This provider-specific app branch passes its already-selected identity to a shared helper."),
         SuppressedProviderReference(
             path: "Sources/CodexBarCLI/CLICostCommand.swift",
-            line: 499,
+            line: 507,
             anchor: "lines.append(Self.costEstimateHint(provider: .codex))",
             expectedProviderIDs: ["codex"],
             reason: "This provider-specific app branch passes its already-selected identity to a shared helper."),
         SuppressedProviderReference(
             path: "Sources/CodexBarCLI/CLICostCommand.swift",
-            line: 904,
+            line: 912,
             anchor: "let account = try context.resolvedAccounts(for: .cursor).first",
             expectedProviderIDs: ["cursor"],
             reason: "The Cursor-only cookie-settings resolver passes its fixed identity to token-account helpers."),
         SuppressedProviderReference(
             path: "Sources/CodexBarCLI/CLICostCommand.swift",
-            line: 905,
+            line: 913,
             anchor: "return context.settingsSnapshot(for: .cursor, account: account)?.cursor",
             expectedProviderIDs: ["cursor"],
             reason: "The Cursor-only cookie-settings resolver passes its fixed identity to token-account helpers."),
@@ -1446,19 +1446,19 @@ struct ProviderArchitectureGatekeeperTests {
             reason: "This provider-specific core branch passes its already-selected identity to a shared helper."),
         SuppressedProviderReference(
             path: "Sources/CodexBarCore/CostUsageFetcher.swift",
-            line: 1209,
+            line: 1232,
             anchor: "provider: .codex,",
             expectedProviderIDs: ["codex"],
             reason: "This provider-specific core branch passes its already-selected identity to a shared helper."),
         SuppressedProviderReference(
             path: "Sources/CodexBarCore/CostUsageFetcher.swift",
-            line: 1293,
+            line: 1316,
             anchor: "provider: .codex,",
             expectedProviderIDs: ["codex"],
             reason: "This provider-specific core branch passes its already-selected identity to a shared helper."),
         SuppressedProviderReference(
             path: "Sources/CodexBarCore/CostUsageFetcher.swift",
-            line: 1394,
+            line: 1417,
             anchor: "provider: .codex,",
             expectedProviderIDs: ["codex"],
             reason: "This provider-specific core branch passes its already-selected identity to a shared helper."),
@@ -1870,7 +1870,7 @@ struct ProviderArchitectureGatekeeperTests {
             reason: "This exact shared renderer maps provider-owned presentation data into the generic UI model."),
         AllowedProviderConstruct(
             path: "Sources/CodexBar/MenuCardView+Costs.swift",
-            line: 519,
+            line: 521,
             anchor: "if style == .claude {",
             expectedProviderIDs: ["claude"],
             expectedReferenceCount: 1,
@@ -3489,15 +3489,15 @@ struct ProviderArchitectureGatekeeperTests {
             reason: "This exact CLI construct preserves the provider-specific command and output contract."),
         AllowedProviderConstruct(
             path: "Sources/CodexBarCLI/CLICostCommand.swift",
-            line: 565,
-            anchor: "provider == .codex",
-            expectedProviderIDs: ["codex"],
-            expectedReferenceCount: 1,
-            expectedReferenceFingerprint: ["codex@0"],
+            line: 573,
+            anchor: "provider == .codex || provider == .grok || provider == .muse",
+            expectedProviderIDs: ["codex", "grok", "muse"],
+            expectedReferenceCount: 3,
+            expectedReferenceFingerprint: ["codex@0", "grok@0", "muse@0"],
             reason: "This exact CLI construct preserves the provider-specific command and output contract."),
         AllowedProviderConstruct(
             path: "Sources/CodexBarCLI/CLICostCommand.swift",
-            line: 668,
+            line: 676,
             anchor: "let projects = provider == .codex",
             expectedProviderIDs: ["codex"],
             expectedReferenceCount: 1,
@@ -3505,7 +3505,7 @@ struct ProviderArchitectureGatekeeperTests {
             reason: "This exact CLI construct preserves the provider-specific command and output contract."),
         AllowedProviderConstruct(
             path: "Sources/CodexBarCLI/CLICostCommand.swift",
-            line: 914,
+            line: 922,
             anchor: "guard provider == .cursor else { return nil }",
             expectedProviderIDs: ["cursor"],
             expectedReferenceCount: 1,
@@ -3513,7 +3513,7 @@ struct ProviderArchitectureGatekeeperTests {
             reason: "This exact CLI construct preserves the provider-specific command and output contract."),
         AllowedProviderConstruct(
             path: "Sources/CodexBarCLI/CLICostCommand.swift",
-            line: 934,
+            line: 942,
             anchor: "guard provider == .cursor, settings?.cookieSource == .manual else { return nil }",
             expectedProviderIDs: ["cursor"],
             expectedReferenceCount: 1,
@@ -3587,7 +3587,7 @@ struct ProviderArchitectureGatekeeperTests {
             reason: "This exact shared construct dispatches a provider-owned capability at the generic integration boundary."),
         AllowedProviderConstruct(
             path: "Sources/CodexBarCore/CostUsageFetcher.swift",
-            line: 907,
+            line: 929,
             anchor: "var historyCoverageIsEstablished = provider != .codex",
             expectedProviderIDs: ["codex"],
             expectedReferenceCount: 2,
@@ -3595,7 +3595,7 @@ struct ProviderArchitectureGatekeeperTests {
             reason: "This exact cost scanner dispatch selects a provider-owned transcript, cache, or pricing format."),
         AllowedProviderConstruct(
             path: "Sources/CodexBarCore/CostUsageFetcher.swift",
-            line: 940,
+            line: 962,
             anchor: "provider == .claude || (provider == .codex && options.shouldMergePiUsage)",
             expectedProviderIDs: ["claude", "codex"],
             expectedReferenceCount: 2,
@@ -3603,7 +3603,7 @@ struct ProviderArchitectureGatekeeperTests {
             reason: "This exact cost scanner dispatch selects a provider-owned transcript, cache, or pricing format."),
         AllowedProviderConstruct(
             path: "Sources/CodexBarCore/CostUsageFetcher.swift",
-            line: 972,
+            line: 994,
             anchor: "if provider == .codex {",
             expectedProviderIDs: ["codex"],
             expectedReferenceCount: 1,
@@ -3611,15 +3611,15 @@ struct ProviderArchitectureGatekeeperTests {
             reason: "Codex project totals must merge native-ledger and Pi contributions before publishing the report."),
         AllowedProviderConstruct(
             path: "Sources/CodexBarCore/CostUsageFetcher.swift",
-            line: 1026,
+            line: 1048,
             anchor: "options.provider == .codex || options.provider == .claude || options.provider == .antigravity",
-            expectedProviderIDs: ["antigravity", "claude", "codex"],
-            expectedReferenceCount: 3,
-            expectedReferenceFingerprint: ["antigravity@0", "claude@0", "codex@0"],
+            expectedProviderIDs: ["antigravity", "claude", "codex", "grok", "muse"],
+            expectedReferenceCount: 5,
+            expectedReferenceFingerprint: ["antigravity@0", "claude@0", "codex@0", "grok@1", "muse@1"],
             reason: "This exact cost scanner dispatch selects a provider-owned transcript, cache, or pricing format."),
         AllowedProviderConstruct(
             path: "Sources/CodexBarCore/CostUsageFetcher.swift",
-            line: 1101,
+            line: 1124,
             anchor: "guard provider == .codex || provider == .claude || provider == .antigravity else { return nil }",
             expectedProviderIDs: ["antigravity", "claude", "codex"],
             expectedReferenceCount: 5,
@@ -3627,7 +3627,7 @@ struct ProviderArchitectureGatekeeperTests {
             reason: "This exact cost scanner dispatch selects a provider-owned transcript, cache, or pricing format."),
         AllowedProviderConstruct(
             path: "Sources/CodexBarCore/CostUsageFetcher.swift",
-            line: 1835,
+            line: 1858,
             anchor: "if provider == .vertexai {",
             expectedProviderIDs: ["claude", "vertexai"],
             expectedReferenceCount: 2,
@@ -3635,7 +3635,7 @@ struct ProviderArchitectureGatekeeperTests {
             reason: "This exact cost scanner dispatch selects a provider-owned transcript, cache, or pricing format."),
         AllowedProviderConstruct(
             path: "Sources/CodexBarCore/CostUsageFetcher.swift",
-            line: 2105,
+            line: 2128,
             anchor: "if provider == .cursor {",
             expectedProviderIDs: ["cursor"],
             expectedReferenceCount: 1,

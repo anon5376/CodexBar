@@ -242,6 +242,7 @@ public enum GrokLocalSessionScanner {
             customPricing: customPricing)
         guard let refreshed = await pricing.catalog(
             pricing: self.unpricedModelIDs(in: summary),
+            // Provider-specific by design: Grok Build models are listed under xAI in the price catalog.
             providerID: "xai",
             now: now)
         else { return summary }
@@ -541,6 +542,7 @@ public enum GrokLocalSessionScanner {
             for turn in session.turns where turn.at >= lookbackCutoff {
                 guard let day = self.dayKey(for: turn.at, calendar: calendar) else { continue }
                 let cost = SubscriptionListPrice.estimateUSD(
+                    // Provider-specific by design: Grok Build models are listed under xAI in the price catalog.
                     providerID: "xai",
                     modelID: turn.model,
                     usage: .init(

@@ -262,6 +262,7 @@ extension UsageMenuCardView.Model {
         let hints = [
             Self.tokenUsageHint(provider: provider),
             UsageFormatter.incompleteUsageNote(incompleteCount),
+            // Provider-specific by design: Muse and Grok state local-history coverage alongside dollars.
             (tokensOnly || provider == .muse || provider == .grok)
                 ? Self.tokenHistoryCoverageHint(snapshot) : nil,
         ]
