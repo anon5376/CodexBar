@@ -87,9 +87,13 @@ public enum GrokProviderDescriptor {
             tokenCost: ProviderTokenCostConfig(
                 supportsTokenCost: true,
                 noDataMessage: {
-                    "Grok token totals come from local ~/.grok/sessions logs. "
-                        + "Subscription credits are not converted to dollars."
-                }),
+                    "Grok token totals come from local session turns when they record usage, "
+                        + "otherwise from session signals. Dollar amounts are public API list prices, "
+                        + "not a SuperGrok bill. Subscription credits stay a quota."
+                },
+                menuHintLines: [.localized("codex_api_estimate_hint")],
+                showsHintInProviderDetails: true,
+                estimateDisclaimer: "Estimated from token usage · not a subscription bill"),
             pace: ProviderPaceCapability(
                 resetWindowPace: .custom { window, now in
                     guard Self.primaryLabel(window: window, now: now) == "Weekly",

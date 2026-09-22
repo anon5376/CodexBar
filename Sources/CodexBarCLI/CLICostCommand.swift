@@ -187,13 +187,14 @@ extension CodexBarCLI {
         // Provider-specific by design: Antigravity is the one cost provider whose local models can
         // all be absent from the pricing catalog, so it falls back to the token-only rendering.
         // Other providers keep the cost shape and render their unknown values as dashes.
-        let costIsEntirelyUnknown = provider == .antigravity
+        let subscriptionEstimate = provider == .codex || provider == .grok || provider == .muse
+        let costIsEntirelyUnknown = (provider == .antigravity || provider == .muse || provider == .grok)
             && (snapshot.last30DaysCostUSD == nil || (snapshot.daily.isEmpty && snapshot.last30DaysCostUSD == 0))
         if descriptor.tokenCost.presentation == .tokensOnly || costIsEntirelyUnknown {
             return Self.renderLocalTokenHistoryText(name: name, snapshot: snapshot, useColor: useColor)
         }
-        // Provider-specific by design: Codex cost is explicitly an API-equivalent local-session estimate.
-        let title = provider == .codex
+        // Provider-specific by design: subscription estimates are local tokens times public API prices.
+        let title = subscriptionEstimate
             ? "\(name) API-equivalent estimate (not billed)"
             : "\(name) Cost (API-rate estimate)"
         let header = Self.costHeaderLine(title, useColor: useColor)
@@ -562,7 +563,7 @@ extension CodexBarCLI {
     }
 
     private static func costEstimateHint(provider: UsageProvider) -> String {
-        provider == .codex
+        provider == .codex || provider == .grok || provider == .muse
             ? "Not a subscription bill or plan value · local usage × public API prices"
             : UsageFormatter.costEstimateHint(provider: provider)
     }

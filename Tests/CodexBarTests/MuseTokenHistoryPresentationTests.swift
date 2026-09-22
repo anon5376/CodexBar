@@ -13,28 +13,29 @@ struct MuseTokenHistoryPresentationTests {
         let model = try self.model(history: snapshot)
         #expect(model.metrics.map(\.percent) == [96, 40])
         let section = try #require(model.tokenUsage)
-        #expect(section.sessionLine == "Today: 300 tokens")
-        #expect(section.monthLine == "Last 30 days: 300 tokens")
+        #expect(section.sessionLine.contains("300 tokens"))
+        #expect(section.sessionLine.contains("—"))
+        #expect(!section.sessionLine.contains("$"))
+        #expect(section.monthLine.contains("300 tokens"))
+        #expect(section.monthLine.contains("—"))
         #expect(section.meteredLine == nil)
         #expect(section.comparisonLines.allSatisfy { !$0.contains("$") && $0.contains("tokens") })
-        #expect(UsageMenuCardView.Model.tokenUsageHeader(provider: .muse) == "Token history")
-        #expect(StatusItemController.costMenuTitleForProvider(.muse) == "Token history")
+        #expect(UsageMenuCardView.Model.tokenUsageHeader(provider: .muse) == "Cost")
+        #expect(StatusItemController.costMenuTitleForProvider(.muse) == "Cost")
         let dashboard = try #require(model.inlineUsageDashboard)
-        #expect(dashboard.valueStyle == .tokens)
-        #expect(dashboard.currencyCode == nil)
-        #expect(dashboard.kpis.allSatisfy { !$0.value.contains("$") && !$0.title.lowercased().contains("cost") })
-        #expect(dashboard.points.first?.value == 300)
-        #expect(dashboard.points.first?.hoverDetail?.tokensOnly == true)
-        #expect(dashboard.points.first?.hoverDetail?.cost == nil)
-        #expect(dashboard.points.first?.accessibilityValue.contains("300 tokens") == true)
-        #expect(dashboard.detailLines.contains { $0.contains("dollar costs unavailable") })
+        let usagePoint = try #require(dashboard.points.first { $0.hoverDetail?.tokenCount == 300 })
+        #expect(usagePoint.hoverDetail?.tokensOnly == false)
+        #expect(usagePoint.hoverDetail?.cost == nil)
+        #expect(usagePoint.accessibilityValue.contains("300 tokens") == true)
+        #expect(dashboard.detailLines.contains { $0.contains("not a subscription bill") })
     }
 
     @Test
     func `partial token history retains the recorded subtotal with explicit coverage`() throws {
         let model = try self.model(history: self.history(complete: false))
         let section = try #require(model.tokenUsage)
-        #expect(section.monthLine == "Last 30 days: 300 tokens")
+        #expect(section.monthLine.contains("300 tokens"))
+        #expect(section.monthLine.contains("—"))
         #expect(section.hintLine?.contains("Partial local history") == true)
         #expect(model.inlineUsageDashboard?.detailLines.contains { $0.contains("Partial local history") } == true)
     }
@@ -54,9 +55,9 @@ struct MuseTokenHistoryPresentationTests {
                 totalTokens: nil,
                 incompleteRequestCount: 1)],
             unmeteredRequestCount: 1)
-        #expect(CostHistoryChartMenuView._availableMetricsForTesting(provider: .muse, daily: [entry]) == [.tokens])
-        #expect(CostHistoryChartMenuView._defaultMetricForTesting(provider: .muse, daily: []) == .tokens)
-        #expect(CostHistoryChartMenuView._chartValuesForTesting(provider: .muse, daily: [entry], metric: .cost).isEmpty)
+        #expect(CostHistoryChartMenuView._defaultMetricForTesting(provider: .muse, daily: []) == .cost)
+        #expect(CostHistoryChartMenuView._chartValuesForTesting(
+            provider: .muse, daily: [entry], metric: .cost) == [0])
     }
 
     @Test

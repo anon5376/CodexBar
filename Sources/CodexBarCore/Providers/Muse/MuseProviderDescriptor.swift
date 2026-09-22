@@ -47,11 +47,11 @@ public enum MuseProviderDescriptor {
             tokenCost: ProviderTokenCostConfig(
                 supportsTokenCost: true,
                 noDataMessage: { "No readable Muse session token history found." },
-                menuHintLines: [.literal("Local token history · dollar costs unavailable")],
+                menuHintLines: [.localized("codex_api_estimate_hint")],
                 supportsTokenSnapshot: true,
                 showsHintInProviderDetails: true,
-                estimateDisclaimer: "Local token history · dollar costs unavailable",
-                presentation: .tokensOnly),
+                estimateDisclaimer: "Estimated from token usage · not a subscription bill",
+                presentation: .costAndTokens),
             presentation: ProviderUsagePresentation(
                 menuCard: ProviderMenuCardPresentation(supportsInlineTokenCostDashboard: true)),
             fetchPlan: ProviderFetchPlan(

@@ -20,7 +20,16 @@ struct MuseLocalUsageCache: Codable {
         var reasoningTokens: Int
         var totalTokens: Int
         var requestCount: Int
-        var models: [String: Int]
+        var modelUsage: [String: ModelUsage]
+
+        struct ModelUsage: Codable, Equatable {
+            var inputTokens: Int = 0
+            var outputTokens: Int = 0
+            var cacheReadTokens: Int = 0
+            var cacheWriteTokens: Int = 0
+            var totalTokens: Int = 0
+            var requestCount: Int = 0
+        }
 
         init(
             inputTokens: Int = 0,
@@ -30,7 +39,7 @@ struct MuseLocalUsageCache: Codable {
             reasoningTokens: Int = 0,
             totalTokens: Int = 0,
             requestCount: Int = 0,
-            models: [String: Int] = [:])
+            modelUsage: [String: ModelUsage] = [:])
         {
             self.inputTokens = inputTokens
             self.outputTokens = outputTokens
@@ -39,7 +48,7 @@ struct MuseLocalUsageCache: Codable {
             self.reasoningTokens = reasoningTokens
             self.totalTokens = totalTokens
             self.requestCount = requestCount
-            self.models = models
+            self.modelUsage = modelUsage
         }
     }
 

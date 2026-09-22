@@ -2,6 +2,10 @@
 
 ## 0.64.2 — Unreleased
 
+### Improved
+
+- Subscriptions: count Grok and Muse Code local usage in tokens and in public API list-price dollars. Quota bars stay quotas. A model without a list price stays unpriced instead of becoming $0, and the dollar figure is not a subscription bill. Antigravity, Codex, and Claude already reported this estimate.
+
 ## 0.64.1 — 2026-09-22
 
 ### Highlights

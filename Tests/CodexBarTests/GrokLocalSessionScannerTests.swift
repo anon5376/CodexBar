@@ -109,6 +109,48 @@ struct GrokLocalSessionScannerTests {
         #expect(snapshot.updatedAt == localScanTime)
     }
 
+    @Test
+    func `turn usage replaces signal context and prices the public model`() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("grok-turn-price-\(UUID().uuidString)", isDirectory: true)
+        let session = root.appendingPathComponent("sessions/%2Ftmp%2Fdemo/session-a", isDirectory: true)
+        try FileManager.default.createDirectory(at: session, withIntermediateDirectories: true)
+        let when = Date(timeIntervalSince1970: 1_787_079_600)
+        try self.writeSignals(
+            at: session.appendingPathComponent("signals.json"),
+            tokens: 10,
+            model: "grok-4.6",
+            date: when)
+        let usage = """
+        {"timestamp":1787079600,"method":"_x.ai/session/update","params":{"update":{"sessionUpdate":"turn_completed","prompt_id":"p1","usage":{"inputTokens":1000,"outputTokens":50,"totalTokens":1050,"cachedReadTokens":200,"cacheCreationTokens":0,"reasoningTokens":10,"modelUsage":{"grok-4.6-build":{"inputTokens":1000,"outputTokens":50,"totalTokens":1050,"cachedReadTokens":200,"cacheCreationTokens":0,"reasoningTokens":10}}}}}}
+        """
+        try usage.write(to: session.appendingPathComponent("updates.jsonl"), atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes(
+            [.modificationDate: when],
+            ofItemAtPath: session.appendingPathComponent("updates.jsonl").path)
+
+        let summary = try GrokLocalSessionScanner.summarize(
+            env: ["GROK_HOME": root.path],
+            fileManager: .default,
+            lookbackDays: 7,
+            now: when,
+            catalog: self.catalog(),
+            customPricing: .empty)
+        #expect(summary.totalTokens == 1050)
+        let snapshot = try #require(summary.toCostUsageTokenSnapshot(historyDays: 7))
+        #expect(snapshot.last30DaysTokens == 1050)
+        #expect(snapshot.costProvenance == .listPriceEstimate)
+        let cost = try #require(snapshot.last30DaysCostUSD)
+        #expect(abs(cost - 0.002) < 0.0000001)
+    }
+
+    private func catalog() throws -> ModelsDevCatalog {
+        let json = """
+        {"xai":{"id":"xai","models":{"grok-4.6":{"id":"grok-4.6","cost":{"input":2,"output":6,"cache_read":0.5}}}}}
+        """
+        return try JSONDecoder().decode(ModelsDevCatalog.self, from: Data(json.utf8))
+    }
+
     private func writeSignals(at url: URL, tokens: Int, model: String, date: Date) throws {
         let payload: [String: Any] = [
             "contextTokensUsed": tokens,

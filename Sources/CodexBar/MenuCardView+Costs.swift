@@ -262,7 +262,8 @@ extension UsageMenuCardView.Model {
         let hints = [
             Self.tokenUsageHint(provider: provider),
             UsageFormatter.incompleteUsageNote(incompleteCount),
-            tokensOnly ? Self.tokenHistoryCoverageHint(snapshot) : nil,
+            (tokensOnly || provider == .muse || provider == .grok)
+                ? Self.tokenHistoryCoverageHint(snapshot) : nil,
         ]
             .compactMap(\.self)
         return TokenUsageSection(

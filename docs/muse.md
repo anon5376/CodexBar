@@ -7,7 +7,7 @@ read_when:
 
 # Muse Code
 
-CodexBar shows Muse Code subscription usage and local token history. Subscription quota comes from the bundled JavaScript provider; token history comes from the Muse CLI's session logs. Dollar costs remain unavailable because those logs do not provide billing amounts.
+CodexBar shows Muse Code subscription usage and local token history. Subscription quota comes from the bundled JavaScript provider; token history comes from the Muse CLI's session logs. Dollar amounts are public API list prices for those tokens. They are not a Muse subscription charge, and a model missing from the price catalog stays unpriced instead of becoming $0.
 
 ## Authentication
 
@@ -41,11 +41,11 @@ An active subscription whose mint response omits `subs_usage` or returns it as `
 
 ## Local token history
 
-Enable local usage tracking to show today's tokens, recent daily history, and token comparisons below the subscription windows. The command `codexbar cost --provider muse` also reports tokens; its JSON keeps unavailable monetary fields absent. Local history requires no provider request, credential access, or pricing download.
+Enable local usage tracking to show today's tokens, the API-equivalent dollar estimate, and recent daily history below the subscription windows. The command `codexbar cost --provider muse` reports both. JSON leaves monetary fields absent when a recorded model has no list price. Local history requires no provider request or credential access. Prices come from the cached models.dev catalog.
 
 The reader uses `$MUSE_SESSIONS_DIR`, or `$XDG_DATA_HOME/muse/sessions` (default `~/.local/share/muse/sessions`). It reads `YYYY/MM/DD/session/session.jsonl` files and buckets turns by their recorded timestamp in the local calendar, including turns written after a session's directory date. This is machine-local history across the selected session tree, not an account billing statement or a quota estimate.
 
-Only `model_completed` and `automated_review_completed` inference records count. Tokens total input plus output; cached and reasoning counters are subsets, so they are not added again. CPU telemetry, child rollups, and goal attribution do not duplicate usage. Unknown models keep their recorded token totals and remain unpriced.
+Only `model_completed` and `automated_review_completed` inference records count. Tokens total input plus output; cached and reasoning counters are subsets, so they are not added again. CPU telemetry, child rollups, and goal attribution do not duplicate usage. Each model's tokens are priced on the Meta list. A day that includes an unpriced model keeps its token total and omits the dollar total. Unknown models keep their recorded token totals and remain unpriced.
 
 Scans are bounded to 30 seconds and 2 GiB of newly read data per refresh, with per-file and per-line bounds. Newly parsed events within the requested dates have a separate 16 MiB conservative size budget, and caches have a 64 MiB limit checked before JSON encoding. Completed files are cached by file identity and precise timestamps; subsequent refreshes can reach additional files without rereading unchanged logs. Interrupted files restart on the next refresh. Changed roots, requested date ranges, calendars, and timezones invalidate cached bucketing. Corrupt records, unsupported usage shapes, unreadable files, and exhausted budgets produce explicitly partial or unavailable history, preserving valid recorded subtotals. An unavailable day is never presented as a measured zero.
 

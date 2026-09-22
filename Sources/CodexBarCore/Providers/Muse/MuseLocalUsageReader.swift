@@ -183,12 +183,18 @@ enum MuseLocalUsageReader {
         untilDayKey: String? = nil,
         cacheRoot: URL,
         forceRescan: Bool = false,
+        estimateCost: Bool = false,
+        pricingCatalog: ModelsDevCatalog? = nil,
+        customPricing: CostUsageCustomPricing = .empty,
         limits: Limits = Limits(),
         clock: @escaping () -> TimeInterval = { ProcessInfo.processInfo.systemUptime },
         checkCancellation: @escaping () throws -> Void = {}) throws -> DailyReportResult
     {
         let budget = Budget(limits: limits, clock: clock, cancellation: checkCancellation)
         let range = DayRange(since: sinceDayKey, until: untilDayKey)
+        let catalog = estimateCost
+            ? (pricingCatalog ?? CostUsagePricing.modelsDevCatalog(cacheRoot: cacheRoot))
+            : nil
         var cache = MuseLocalUsageCacheIO.load(
             sessionsRoot: context.sessionsRoot,
             cacheRoot: cacheRoot,
@@ -246,7 +252,11 @@ enum MuseLocalUsageReader {
             calendar: calendar,
             sinceDayKey: sinceDayKey,
             untilDayKey: untilDayKey)
-        return self.result(days: days, isComplete: isComplete)
+        return self.result(
+            days: days,
+            isComplete: isComplete,
+            catalog: catalog,
+            customPricing: customPricing)
     }
 
     /// Reuses only completed files whose identity and precise metadata still match.
@@ -317,12 +327,28 @@ enum MuseLocalUsageReader {
                   let cacheWrite = self.checkedAdd(totals.cacheWriteTokens, event.cacheWriteTokens),
                   let reasoning = self.checkedAdd(totals.reasoningTokens, event.reasoningTokens),
                   let total = self.checkedAdd(totals.totalTokens, event.totalTokens),
-                  let requests = self.checkedAdd(totals.requestCount, 1),
-                  let model = self.checkedAdd(totals.models[event.model, default: 0], event.totalTokens)
+                  let requests = self.checkedAdd(totals.requestCount, 1)
             else {
                 complete = false
                 continue
             }
+            var model = totals.modelUsage[event.model] ?? MuseLocalUsageCache.DayTotals.ModelUsage()
+            guard let modelInput = self.checkedAdd(model.inputTokens, event.inputTokens),
+                  let modelOutput = self.checkedAdd(model.outputTokens, event.outputTokens),
+                  let modelRead = self.checkedAdd(model.cacheReadTokens, event.cacheReadTokens),
+                  let modelWrite = self.checkedAdd(model.cacheWriteTokens, event.cacheWriteTokens),
+                  let modelTotal = self.checkedAdd(model.totalTokens, event.totalTokens),
+                  let modelRequests = self.checkedAdd(model.requestCount, 1)
+            else {
+                complete = false
+                continue
+            }
+            model.inputTokens = modelInput
+            model.outputTokens = modelOutput
+            model.cacheReadTokens = modelRead
+            model.cacheWriteTokens = modelWrite
+            model.totalTokens = modelTotal
+            model.requestCount = modelRequests
             totals.inputTokens = input
             totals.outputTokens = output
             totals.cacheReadTokens = cacheRead
@@ -330,7 +356,7 @@ enum MuseLocalUsageReader {
             totals.reasoningTokens = reasoning
             totals.totalTokens = total
             totals.requestCount = requests
-            totals.models[event.model] = model
+            totals.modelUsage[event.model] = model
             days[event.day] = totals
         }
         return complete
@@ -338,27 +364,18 @@ enum MuseLocalUsageReader {
 
     private static func result(
         days: [String: MuseLocalUsageCache.DayTotals],
-        isComplete: Bool) -> DailyReportResult
+        isComplete: Bool,
+        catalog: ModelsDevCatalog?,
+        customPricing: CostUsageCustomPricing) -> DailyReportResult
     {
         let daily = days.map { date, totals in
-            CostUsageDailyReport.Entry(
-                date: date,
-                inputTokens: totals.inputTokens,
-                outputTokens: totals.outputTokens,
-                cacheReadTokens: totals.cacheReadTokens,
-                cacheCreationTokens: totals.cacheWriteTokens,
-                reasoningTokens: totals.reasoningTokens,
-                totalTokens: totals.totalTokens,
-                requestCount: totals.requestCount,
-                costUSD: nil,
-                modelsUsed: nil,
-                modelBreakdowns: totals.models.keys.sorted().map { model in
-                    .init(modelName: model, costUSD: nil, totalTokens: totals.models[model], requestCount: nil)
-                })
+            self.entry(date: date, totals: totals, catalog: catalog, customPricing: customPricing)
         }.sorted { $0.date < $1.date }
         let input = self.checkedSum(daily.compactMap(\.inputTokens))
         let output = self.checkedSum(daily.compactMap(\.outputTokens))
         let total = self.checkedSum(daily.compactMap(\.totalTokens))
+        let costs = daily.compactMap(\.costUSD)
+        let everyDayPriced = !daily.isEmpty && daily.allSatisfy { ($0.totalTokens ?? 0) == 0 || $0.costUSD != nil }
         let complete = isComplete && input != nil && output != nil && total != nil
         return DailyReportResult(
             report: .init(
@@ -367,8 +384,71 @@ enum MuseLocalUsageReader {
                     totalInputTokens: input,
                     totalOutputTokens: output,
                     totalTokens: total,
-                    totalCostUSD: nil)),
+                    totalCostUSD: everyDayPriced ? costs.reduce(0, +) : nil)),
             coverage: complete ? .complete : .partial)
+    }
+
+    private static func entry(
+        date: String,
+        totals: MuseLocalUsageCache.DayTotals,
+        catalog: ModelsDevCatalog?,
+        customPricing: CostUsageCustomPricing) -> CostUsageDailyReport.Entry
+    {
+        var cost = 0.0
+        var sawCost = false
+        var everyModelPriced = true
+        var estimated = 0
+        var unpriced = 0
+        let breakdowns = totals.modelUsage.keys.sorted().map { name in
+            let usage = totals.modelUsage[name] ?? MuseLocalUsageCache.DayTotals.ModelUsage()
+            let modelCost = catalog.flatMap {
+                SubscriptionListPrice.estimateUSD(
+                    providerID: "meta",
+                    modelID: name,
+                    inputTokens: usage.inputTokens,
+                    outputTokens: usage.outputTokens,
+                    cacheReadTokens: usage.cacheReadTokens,
+                    cacheCreationTokens: usage.cacheWriteTokens,
+                    catalog: $0,
+                    customPricing: customPricing)
+            }
+            if usage.totalTokens > 0 {
+                if let modelCost {
+                    cost += modelCost
+                    sawCost = true
+                    estimated += usage.requestCount
+                } else {
+                    everyModelPriced = false
+                    unpriced += usage.requestCount
+                }
+            }
+            return CostUsageDailyReport.ModelBreakdown(
+                modelName: name,
+                costUSD: modelCost,
+                totalTokens: usage.totalTokens,
+                requestCount: usage.requestCount,
+                inputTokens: usage.inputTokens,
+                outputTokens: usage.outputTokens,
+                cacheReadTokens: usage.cacheReadTokens,
+                cacheCreationTokens: usage.cacheWriteTokens)
+        }
+        let dayCost: Double? = everyModelPriced && sawCost ? cost : nil
+        let attempted = catalog != nil
+        return CostUsageDailyReport.Entry(
+            date: date,
+            inputTokens: totals.inputTokens,
+            outputTokens: totals.outputTokens,
+            cacheReadTokens: totals.cacheReadTokens,
+            cacheCreationTokens: totals.cacheWriteTokens,
+            reasoningTokens: totals.reasoningTokens,
+            totalTokens: totals.totalTokens,
+            requestCount: totals.requestCount,
+            costUSD: dayCost,
+            modelsUsed: breakdowns.map(\.modelName),
+            modelBreakdowns: breakdowns,
+            unpricedRequestCount: attempted ? unpriced : nil,
+            estimatedRequestCount: attempted ? estimated : nil,
+            pricedRequestCount: attempted ? 0 : nil)
     }
 
     // MARK: - Discovery

@@ -589,7 +589,7 @@ public struct CostUsageFetcher: Sendable {
                 historyDays: clampedHistoryDays,
                 calendar: fallbackCalendar))
         }
-        // Provider-specific by design: Muse local history has token evidence but no established dollar rates.
+        // Provider-specific by design: Muse prices local session tokens at Meta's public list rates.
         if provider == .muse {
             return try await CostUsageTokenResult(snapshot: Self.loadMuseLocalSnapshot(
                 environment: environment,
