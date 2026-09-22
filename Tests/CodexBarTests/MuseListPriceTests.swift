@@ -221,9 +221,13 @@ private struct MuseMixedCatalogTransport: ModelsDevHTTPTransport {
             statusCode: 200,
             httpVersion: nil,
             headerFields: nil)!
+        // Refreshes require priceable anthropic and openai rows to count as plausible.
         let json = """
         {"meta":{"id":"meta","models":{"muse-spark-1.3-contributor":{"id":"muse-spark-1.3-contributor",\
-        "cost":{"input":0.1,"output":0.2,"cache_read":0.002}}}}}
+        "cost":{"input":0.1,"output":0.2,"cache_read":0.002}}}},\
+        "anthropic":{"id":"anthropic","models":{"claude-stub":{"id":"claude-stub",\
+        "cost":{"input":1,"output":2}}}},\
+        "openai":{"id":"openai","models":{"gpt-stub":{"id":"gpt-stub","cost":{"input":1,"output":2}}}}}
         """
         return (Data(json.utf8), response)
     }
