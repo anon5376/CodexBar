@@ -39,7 +39,8 @@ extension CostUsageFetcher {
             pricing: pricing,
             now: now)
         let days = result.report.data
-        let priced = days.contains { $0.costUSD != nil }
+        let anyDayPriced = days.contains { $0.costUSD != nil }
+        let everyDayPriced = anyDayPriced
             && days.allSatisfy { ($0.totalTokens ?? 0) == 0 || $0.costUSD != nil }
         return Self.tokenSnapshot(
             from: result.report,
@@ -47,9 +48,10 @@ extension CostUsageFetcher {
             historyDays: historyDays,
             calendar: calendar,
             historyCoverageIsEstablished: result.isComplete && result.isAvailable,
-            // Empty or wholly unpriced history stays dollar-free instead of reading as $0.
-            monetaryValuesAreAvailable: priced,
-            costProvenance: priced ? .listPriceEstimate : .unknown)
+            // A priced day keeps its dollars when an older day is unpriced; the reader
+            // already leaves the mixed window total unknown instead of reading as $0.
+            monetaryValuesAreAvailable: anyDayPriced,
+            costProvenance: everyDayPriced ? .listPriceEstimate : .unknown)
     }
 
     private static func museReport(

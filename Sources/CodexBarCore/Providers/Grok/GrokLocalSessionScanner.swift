@@ -153,7 +153,13 @@ public enum GrokLocalSessionScanner {
         }
 
         let calendar = Calendar.current
-        let lookbackCutoff = calendar.date(byAdding: .day, value: -lookbackDays, to: now) ?? now
+        // Calendar-day window: the report covers whole local days, matching the narrowed
+        // projection and the CLI's day labels. A one-day report is today only.
+        let startOfToday = calendar.startOfDay(for: now)
+        let windowStart = calendar.date(byAdding: .day, value: -(max(lookbackDays, 1) - 1), to: startOfToday)
+            ?? startOfToday
+        let windowEnd = calendar.date(byAdding: .day, value: 1, to: startOfToday) ?? .distantFuture
+        let window = windowStart..<windowEnd
         var sessions: [String: SessionScan] = [:]
 
         while let url = rootEnum.nextObject() as? URL {
@@ -161,7 +167,7 @@ public enum GrokLocalSessionScanner {
             guard name == "signals.json" || name == "updates.jsonl" else { continue }
             let attrs = try? url.resourceValues(forKeys: [.contentModificationDateKey, .fileSizeKey])
             let mtime = attrs?.contentModificationDate ?? Date.distantPast
-            guard mtime >= lookbackCutoff else { continue }
+            guard mtime >= windowStart else { continue }
             let key = url.deletingLastPathComponent().path
             var session = sessions[key] ?? SessionScan()
             if name == "signals.json" {
@@ -181,7 +187,7 @@ public enum GrokLocalSessionScanner {
         for session in sessions.values {
             let contribution = self.contribution(
                 session,
-                lookbackCutoff: lookbackCutoff,
+                window: window,
                 catalog: catalog,
                 customPricing: customPricing)
             guard !contribution.pieces.isEmpty else { continue }
@@ -531,7 +537,7 @@ public enum GrokLocalSessionScanner {
 
     private static func contribution(
         _ session: SessionScan,
-        lookbackCutoff: Date,
+        window: Range<Date>,
         catalog: ModelsDevCatalog?,
         customPricing: CostUsageCustomPricing) -> Contribution
     {
@@ -539,7 +545,7 @@ public enum GrokLocalSessionScanner {
         if !session.turns.isEmpty, !session.turnParseFailed {
             var pieces: [Piece] = []
             var last: Date?
-            for turn in session.turns where turn.at >= lookbackCutoff {
+            for turn in session.turns where window.contains(turn.at) {
                 guard let day = self.dayKey(for: turn.at, calendar: calendar) else { continue }
                 let cost = SubscriptionListPrice.estimateUSD(
                     // Provider-specific by design: Grok Build models are listed under xAI in the price catalog.
