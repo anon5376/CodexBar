@@ -20,24 +20,94 @@ enum SubscriptionListPrice {
         else { return nil }
         let uncached = inputTokens - cacheReadTokens - cacheCreationTokens
         guard uncached >= 0 else { return nil }
-
-        for model in self.modelIDs(providerID: providerID, modelID: modelID) {
-            if let cost = CostUsagePricing.providerCostUSD(
+        let candidates = self.modelIDs(providerID: providerID, modelID: modelID)
+        guard let exact = candidates.first else { return nil }
+        if let cost = self.price(
+            providerID: providerID,
+            modelID: exact,
+            uncachedInput: uncached,
+            outputTokens: outputTokens,
+            cacheReadTokens: cacheReadTokens,
+            cacheCreationTokens: cacheCreationTokens,
+            catalog: catalog,
+            customPricing: customPricing)
+        {
+            return cost
+        }
+        // An exact row that cannot price a consumed class stays unknown. Aliases apply only
+        // when that exact row is absent.
+        if self.hasPricingRow(
+            providerID: providerID,
+            modelID: exact,
+            catalog: catalog,
+            customPricing: customPricing)
+        {
+            return nil
+        }
+        for alias in candidates.dropFirst() {
+            if let cost = self.price(
                 providerID: providerID,
-                model: model,
-                inputTokens: uncached,
-                cachedInputTokens: cacheReadTokens,
-                cacheWriteInputTokens: cacheCreationTokens,
+                modelID: alias,
+                uncachedInput: uncached,
                 outputTokens: outputTokens,
-                pricingDate: nil,
+                cacheReadTokens: cacheReadTokens,
+                cacheCreationTokens: cacheCreationTokens,
                 catalog: catalog,
-                customPricing: customPricing),
-                cost.isFinite, cost >= 0
+                customPricing: customPricing)
             {
                 return cost
             }
         }
         return nil
+    }
+
+    /// Custom overrides price independent token classes. Catalog lookup keeps the inclusive-input
+    /// convention inside `providerCostUSD`, so this passes the non-cached remainder only.
+    private static func price(
+        providerID: String,
+        modelID: String,
+        uncachedInput: Int,
+        outputTokens: Int,
+        cacheReadTokens: Int,
+        cacheCreationTokens: Int,
+        catalog: ModelsDevCatalog,
+        customPricing: CostUsageCustomPricing) -> Double?
+    {
+        if let rates = customPricing.rates(providerID: providerID, model: modelID) {
+            return self.finite(CostUsageCustomPricing.costUSD(
+                rates: rates,
+                inputTokens: uncachedInput,
+                outputTokens: outputTokens,
+                cacheReadTokens: cacheReadTokens,
+                cacheWriteTokens: cacheCreationTokens))
+        }
+        return self.finite(CostUsagePricing.providerCostUSD(
+            providerID: providerID,
+            model: modelID,
+            inputTokens: uncachedInput,
+            cachedInputTokens: cacheReadTokens,
+            cacheWriteInputTokens: cacheCreationTokens,
+            outputTokens: outputTokens,
+            pricingDate: nil,
+            catalog: catalog,
+            customPricing: .empty))
+    }
+
+    private static func hasPricingRow(
+        providerID: String,
+        modelID: String,
+        catalog: ModelsDevCatalog,
+        customPricing: CostUsageCustomPricing) -> Bool
+    {
+        if customPricing.rates(providerID: providerID, model: modelID) != nil {
+            return true
+        }
+        return catalog.pricing(providerID: providerID, modelID: modelID, exactModelID: true) != nil
+    }
+
+    private static func finite(_ cost: Double?) -> Double? {
+        guard let cost, cost.isFinite, cost >= 0 else { return nil }
+        return cost
     }
 
     /// `grok-4.6-build` is the Grok Build recording of the public `grok-4.6` model.

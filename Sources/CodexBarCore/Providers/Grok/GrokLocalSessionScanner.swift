@@ -1,3 +1,4 @@
+import CoreFoundation
 import Foundation
 
 /// One local-calendar day of Grok session-token activity.
@@ -177,7 +178,11 @@ public enum GrokLocalSessionScanner {
         var days: [String: DayAccum] = [:]
 
         for session in sessions.values {
-            let contribution = self.contribution(session, catalog: catalog, customPricing: customPricing)
+            let contribution = self.contribution(
+                session,
+                lookbackCutoff: lookbackCutoff,
+                catalog: catalog,
+                customPricing: customPricing)
             guard !contribution.pieces.isEmpty else { continue }
             sessionCount += 1
             if let at = contribution.lastAt, at > (lastSessionAt ?? Date.distantPast) {
@@ -217,9 +222,46 @@ public enum GrokLocalSessionScanner {
         lookbackDays: Int = defaultLookbackDays,
         now: Date = .init()) async throws -> GrokLocalSessionSummary
     {
-        let catalog = CostUsagePricing.modelsDevCatalog(now: now)
+        if CostUsagePricing.modelsDevCatalog(now: now) == nil {
+            await ModelsDevPricingPipeline.refreshIfNeeded(now: now)
+        } else {
+            Task.detached(priority: .utility) {
+                await ModelsDevPricingPipeline.refreshIfNeeded(now: now)
+            }
+        }
         let customPricing = CostUsageCustomPricing.load(environment: env)
-        return try await CostUsageScanExecutor.run { checkCancellation in
+        var catalog = CostUsagePricing.modelsDevCatalog(now: now)
+        var summary = try await self.scanSummary(
+            env: env,
+            lookbackDays: lookbackDays,
+            now: now,
+            catalog: catalog,
+            customPricing: customPricing)
+        let unknown = self.unpricedModelIDs(in: summary)
+        guard !unknown.isEmpty else { return summary }
+        let outcome = await ModelsDevPricingPipeline.refreshForUnknownModelsIfNeeded(
+            providerID: "xai",
+            modelIDs: unknown,
+            now: now)
+        guard outcome == .pricingAvailable else { return summary }
+        catalog = CostUsagePricing.modelsDevCatalog(now: now)
+        summary = try await self.scanSummary(
+            env: env,
+            lookbackDays: lookbackDays,
+            now: now,
+            catalog: catalog,
+            customPricing: customPricing)
+        return summary
+    }
+
+    private static func scanSummary(
+        env: [String: String],
+        lookbackDays: Int,
+        now: Date,
+        catalog: ModelsDevCatalog?,
+        customPricing: CostUsageCustomPricing) async throws -> GrokLocalSessionSummary
+    {
+        try await CostUsageScanExecutor.run { checkCancellation in
             try checkCancellation()
             let summary = Self.summarize(
                 env: env,
@@ -231,6 +273,23 @@ public enum GrokLocalSessionScanner {
             try checkCancellation()
             return summary
         }
+    }
+
+    private static func unpricedModelIDs(in summary: GrokLocalSessionSummary) -> Set<String> {
+        var ids = Set<String>()
+        for day in summary.daily {
+            for breakdown in day.modelBreakdowns ?? [] {
+                guard breakdown.costUSD == nil, (breakdown.totalTokens ?? 0) > 0 else { continue }
+                let name = breakdown.modelName.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !name.isEmpty, name != "unknown" else { continue }
+                ids.insert(name)
+                if name.hasSuffix("-build") {
+                    let stem = String(name.dropLast("-build".count))
+                    if !stem.isEmpty { ids.insert(stem) }
+                }
+            }
+        }
+        return ids
     }
 
     private static let maxTurnLogBytes = 32 * 1024 * 1024
@@ -468,6 +527,7 @@ public enum GrokLocalSessionScanner {
 
     private static func contribution(
         _ session: SessionScan,
+        lookbackCutoff: Date,
         catalog: ModelsDevCatalog?,
         customPricing: CostUsageCustomPricing) -> Contribution
     {
@@ -475,7 +535,7 @@ public enum GrokLocalSessionScanner {
         if !session.turns.isEmpty, !session.turnParseFailed {
             var pieces: [Piece] = []
             var last: Date?
-            for turn in session.turns {
+            for turn in session.turns where turn.at >= lookbackCutoff {
                 guard let day = self.dayKey(for: turn.at, calendar: calendar) else { continue }
                 let cost = catalog.flatMap {
                     SubscriptionListPrice.estimateUSD(

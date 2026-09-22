@@ -32,6 +32,44 @@ struct MuseListPriceTests {
     }
 
     @Test
+    func `custom rates charge the uncached remainder once`() throws {
+        let pricing = CostUsageCustomPricing.parse(Data("""
+        {"meta/muse-spark-1.3-contributor":{"input":0.1,"output":0.2,"cache_read":0.002}}
+        """.utf8))
+        let catalog = try self.catalogWithoutCache()
+        let cost = try #require(SubscriptionListPrice.estimateUSD(
+            providerID: "meta",
+            modelID: "muse-spark-1.3-contributor",
+            inputTokens: 1000,
+            outputTokens: 100,
+            cacheReadTokens: 400,
+            cacheCreationTokens: 0,
+            catalog: catalog,
+            customPricing: pricing))
+        #expect(abs(cost - 0.0000808) < 0.0000000001)
+    }
+
+    @Test
+    func `an unpriceable exact grok build row does not borrow the base price`() throws {
+        let json = """
+        {"xai":{"id":"xai","models":{
+          "grok-4.6-build":{"id":"grok-4.6-build","cost":{"input":2,"output":6}},
+          "grok-4.6":{"id":"grok-4.6","cost":{"input":2,"output":6,"cache_read":0.5}}
+        }}}
+        """
+        let catalog = try JSONDecoder().decode(ModelsDevCatalog.self, from: Data(json.utf8))
+        let cost = SubscriptionListPrice.estimateUSD(
+            providerID: "xai",
+            modelID: "grok-4.6-build",
+            inputTokens: 1000,
+            outputTokens: 50,
+            cacheReadTokens: 200,
+            cacheCreationTokens: 0,
+            catalog: catalog)
+        #expect(cost == nil)
+    }
+
+    @Test
     func `missing cache rate does not invent a muse dollar total`() throws {
         let priced = try SubscriptionListPrice.estimateUSD(
             providerID: "meta",

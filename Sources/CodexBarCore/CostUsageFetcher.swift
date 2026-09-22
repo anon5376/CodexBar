@@ -589,13 +589,31 @@ public struct CostUsageFetcher: Sendable {
                 historyDays: clampedHistoryDays,
                 calendar: fallbackCalendar))
         }
+        // Provider-specific by design: Grok prices recorded turns at xAI's public list rates.
+        if provider == .grok {
+            let summary = try await GrokLocalSessionScanner.summarizeOffMainThread(
+                env: environment,
+                lookbackDays: clampedHistoryDays,
+                now: now)
+            if let snapshot = summary.toCostUsageTokenSnapshot(historyDays: clampedHistoryDays) {
+                return CostUsageTokenResult(snapshot: snapshot)
+            }
+            return CostUsageTokenResult(snapshot: Self.unavailableLocalSnapshot(
+                now: now,
+                historyDays: clampedHistoryDays,
+                calendar: fallbackCalendar))
+        }
         // Provider-specific by design: Muse prices local session tokens at Meta's public list rates.
         if provider == .muse {
             return try await CostUsageTokenResult(snapshot: Self.loadMuseLocalSnapshot(
                 environment: environment,
                 now: now,
                 historyDays: clampedHistoryDays,
-                options: fallbackOptions))
+                options: fallbackOptions,
+                allowPricingRefresh: allowPricingRefresh,
+                refreshPricingInBackground: refreshPricingInBackground,
+                retryUnknownPricing: retryUnknownPricing,
+                modelsDevClient: modelsDevClient))
         }
         if let remoteError {
             throw remoteError
@@ -1024,6 +1042,7 @@ public struct CostUsageFetcher: Sendable {
         guard options.isAllowed,
               options.retryUnknown,
               options.provider == .codex || options.provider == .claude || options.provider == .antigravity
+              || options.provider == .muse || options.provider == .grok
         else { return }
 
         if options.inBackground {

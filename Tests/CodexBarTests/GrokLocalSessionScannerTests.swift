@@ -144,6 +144,31 @@ struct GrokLocalSessionScannerTests {
         #expect(abs(cost - 0.002) < 0.0000001)
     }
 
+    @Test
+    func `turns outside the requested window are excluded`() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("grok-turn-window-\(UUID().uuidString)", isDirectory: true)
+        let session = root.appendingPathComponent("sessions/%2Ftmp%2Fdemo/session-a", isDirectory: true)
+        try FileManager.default.createDirectory(at: session, withIntermediateDirectories: true)
+        let when = Date(timeIntervalSince1970: 1_787_079_600)
+        let old = 1_787_079_600 - (40 * 24 * 60 * 60)
+        let usage = """
+        {"timestamp":\(old),"method":"_x.ai/session/update","params":{"update":{"sessionUpdate":"turn_completed","prompt_id":"old","usage":{"inputTokens":400,"outputTokens":100,"totalTokens":500,"cachedReadTokens":0,"cacheCreationTokens":0,"modelUsage":{"grok-4.6":{"inputTokens":400,"outputTokens":100,"totalTokens":500,"cachedReadTokens":0,"cacheCreationTokens":0}}}}}}
+        {"timestamp":1787079600,"method":"_x.ai/session/update","params":{"update":{"sessionUpdate":"turn_completed","prompt_id":"new","usage":{"inputTokens":1000,"outputTokens":50,"totalTokens":1050,"cachedReadTokens":200,"cacheCreationTokens":0,"modelUsage":{"grok-4.6-build":{"inputTokens":1000,"outputTokens":50,"totalTokens":1050,"cachedReadTokens":200,"cacheCreationTokens":0}}}}}}
+        """
+        let updates = session.appendingPathComponent("updates.jsonl")
+        try usage.write(to: updates, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.modificationDate: when], ofItemAtPath: updates.path)
+        let summary = try GrokLocalSessionScanner.summarize(
+            env: ["GROK_HOME": root.path],
+            fileManager: .default,
+            lookbackDays: 7,
+            now: when,
+            catalog: self.catalog(),
+            customPricing: .empty)
+        #expect(summary.totalTokens == 1050)
+    }
+
     private func catalog() throws -> ModelsDevCatalog {
         let json = """
         {"xai":{"id":"xai","models":{"grok-4.6":{"id":"grok-4.6","cost":{"input":2,"output":6,"cache_read":0.5}}}}}

@@ -92,6 +92,7 @@ public enum GrokProviderDescriptor {
                         + "not a SuperGrok bill. Subscription credits stay a quota."
                 },
                 menuHintLines: [.localized("codex_api_estimate_hint")],
+                supportsTokenSnapshot: true,
                 showsHintInProviderDetails: true,
                 estimateDisclaimer: "Estimated from token usage · not a subscription bill"),
             pace: ProviderPaceCapability(
@@ -120,6 +121,7 @@ public enum GrokProviderDescriptor {
             cli: ProviderCLIConfig(
                 name: "grok",
                 versionDetector: { _ in GrokStatusProbe.detectVersion() },
+                supportsCostCommand: true,
                 browserSupportExemption: { _, _, _ in true }))
     }
 

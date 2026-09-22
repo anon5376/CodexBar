@@ -271,9 +271,10 @@ diagnostics even when the RPC path is unavailable.
 Those local daily token buckets also feed the shared Usage & Spend catalog so an
 enabled Grok subscription is counted instead of omitted. When `updates.jsonl`
 contains a `turn_completed` usage record, that turn's input, output, and cache
-tokens replace the session's context-size signal and are priced at xAI's public
-list rate (`grok-4.6-build` uses the `grok-4.6` list price when the catalog has
-no exact row). The dollar figure is an API-equivalent estimate, not a SuperGrok
+tokens replace the session's context-size signal. Turns outside the requested
+history window are dropped. The rest are priced at xAI's public
+list rate (`grok-4.6-build` uses the `grok-4.6` list price only when the catalog
+has no exact row). The dollar figure is an API-equivalent estimate, not a SuperGrok
 bill. A turn whose model has no list price keeps its tokens and omits the
 dollars. Sessions with only `signals.json` stay token counts. SuperGrok/X
 Premium+ credits remain a quota window on the usage bar; they are never

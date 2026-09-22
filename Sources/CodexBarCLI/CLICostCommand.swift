@@ -188,8 +188,15 @@ extension CodexBarCLI {
         // all be absent from the pricing catalog, so it falls back to the token-only rendering.
         // Other providers keep the cost shape and render their unknown values as dashes.
         let subscriptionEstimate = provider == .codex || provider == .grok || provider == .muse
-        let costIsEntirelyUnknown = (provider == .antigravity || provider == .muse || provider == .grok)
+        // Antigravity keeps its established empty-window token rendering. Muse and Grok fall back
+        // only when no day, today, or window total has a dollar value.
+        let antigravityCostIsUnknown = provider == .antigravity
             && (snapshot.last30DaysCostUSD == nil || (snapshot.daily.isEmpty && snapshot.last30DaysCostUSD == 0))
+        let subscriptionCostIsUnknown = (provider == .muse || provider == .grok)
+            && snapshot.sessionCostUSD == nil
+            && snapshot.last30DaysCostUSD == nil
+            && !snapshot.daily.contains { $0.costUSD != nil }
+        let costIsEntirelyUnknown = antigravityCostIsUnknown || subscriptionCostIsUnknown
         if descriptor.tokenCost.presentation == .tokensOnly || costIsEntirelyUnknown {
             return Self.renderLocalTokenHistoryText(name: name, snapshot: snapshot, useColor: useColor)
         }
