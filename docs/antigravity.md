@@ -17,9 +17,18 @@ signal and never enables or falls back to Antigravity automatically.
 
 To use the `agy` CLI source without keeping the desktop app open, install the CLI first
 (`brew install --cask antigravity-cli`; use `ANTIGRAVITY_CLI_PATH` when it is not on PATH), then
-run `agy` once and sign in. CodexBar keeps the signed-in `agy` local HTTPS server alive briefly
+run `agy` once and sign in. An explicit `ANTIGRAVITY_CLI_PATH` is authoritative: if it is empty,
+points to a missing file, or is not executable, CodexBar skips the CLI source instead of discovering another `agy`
+through PATH, installation directories, shell lookup, or aliases. Unset the variable to restore
+automatic discovery. Other providers retain their existing override behavior.
+CodexBar keeps the signed-in `agy` local HTTPS server alive briefly
 after each refresh and stops it when idle, or reuses a signed-in `agy` you already have running
 without taking ownership of that process.
+
+The menu bar also reuses an already-running, same-user `agy` that matches the resolved executable;
+this does not require the desktop app or a saved Google account in CodexBar. Selected accounts still
+require matching identity. CLI quota refresh and **Add Account...** are separate: starting a new OAuth
+login still needs the app's OAuth client or the explicit client environment overrides described below.
 
 `agy` 1.2.2 and later reject tokenless local requests with `401 missing CSRF token` on both ports and do not
 expose the generated token (1.1.28, 1.2.0, and 1.2.1 answer the same request with `200`). When the selected
@@ -35,6 +44,15 @@ on cancellation. It runs in a private empty directory and does not send a model 
 The report contains no account or plan identity: explicit CLI mode remains authoritative, while Auto uses
 this fallback only without a selected token account or explicitly injected OAuth credentials. Successful
 HTTPS results retain their verified identity. Failed command diagnostics do not include raw stderr.
+
+If live sources fail and local conversation history is available, CodexBar labels the result as offline and
+shows a safe explanation of the live failure in settings and CLI usage output. CLI failures distinguish sign-in,
+eligibility, and network problems without exposing stderr, URLs, or account emails. Offline conversation counts
+are history, not measured quota. A successful live fallback keeps its own diagnostic instead.
+
+Provider settings show the last usage source (including CLI, OAuth, and offline) rather than reporting the entire
+provider as undetected when no local language-server process is running. Antigravity does not display a Version
+row because its local detector reports process presence, not a software version.
 
 Antigravity supports four usage data sources:
 
@@ -284,6 +302,19 @@ shared OAuth file can still be used as a fallback credential source.
   the family rule in JavaScript. See `docs/dashboard-api.md`.
 - CLI text and `cards` render quota-summary buckets once, using the same idle-family visibility rule. Missing or disabled quota stays unavailable, including in brief cards, while reset context remains visible. Raw JSON retains every bucket.
 - Linux and Omarchy list each measured quota-summary bucket once with its family title. The most constrained bucket in each family stays first for the tray meters; notification history follows the bucket when its position changes.
+
+## Quota observation history
+
+Pool balances without a recognized session/weekly quota summary retain separate, account-scoped Gemini and
+Claude/GPT observations. Each hour keeps the latest balance and its actual capture time, including replenishment
+without changed or available reset metadata. Unknown/omitted summary cadences use the same observation path.
+History adoption and persistence preserve these observations without inventing a duration or blank reset periods.
+Unavailable responses show the most recently captured history format; structured windows win timestamp ties.
+
+Structured session/weekly summaries keep their existing peak history and session-equivalent forecast behavior.
+When a response includes a usable known session or weekly summary cadence, the chart continues to use structured history.
+A pool reset timestamp alone does not establish a five-hour cycle: session pace forecasts require an explicit
+five-hour duration.
 
 ## Local token history
 

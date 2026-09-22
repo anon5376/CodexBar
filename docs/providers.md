@@ -8,7 +8,7 @@ read_when:
 
 # Providers
 
-CodexBar currently registers 77 provider IDs. Some companies expose multiple surfaces, such as Codex vs OpenAI API or
+CodexBar currently registers 79 provider IDs. Some companies expose multiple surfaces, such as Codex vs OpenAI API or
 OpenCode vs OpenCode Go, because the auth source and quota shape differ.
 
 ## Fetch strategies (current)
@@ -77,7 +77,7 @@ complete when the available scan window covers fewer days.
 | Alibaba Token Plan | Signed-in Bailian CLI (`cli`) → subscription summary API via browser or manual cookies (`web`). |
 | Qwen Cloud | Qwen Cloud 5-hour/weekly Token Plan APIs via browser or manual cookies (`web`). |
 | Droid/Factory | API key (`FACTORY_API_KEY` / config) → web cookies → stored tokens → local storage → WorkOS cookies (`auto`, `api`, `web`). |
-| Devin | Chrome localStorage session or manual Bearer token → daily and weekly quota API (`web`). |
+| Devin | Chromium localStorage session or manual Bearer token → daily and weekly quota API (`web`). |
 | z.ai | API token from config/env → quota API (`api`). |
 | Manus | Browser `session_id` cookie (auto/manual/env) → credits API (`web`). |
 | MiniMax | Manual/browser session via Coding Plan web path (`web`), or Coding Plan API token (`api`). |
@@ -129,6 +129,7 @@ complete when the available scan window covers fewer days.
 | sub2api | API key + base URL → gateway quota, subscription limits, wallet balance, and per-key usage (`api`). |
 | Wayfinder | Local gateway URL → `/healthz`, `/v1/savings`, `/router/models`, `/metrics` for health, routing split, savings, and decision latency (`api`). |
 | LiteLLM | API key + base URL → `/key/info`, then `/user/info` or `/team/info` budget usage (`api`). |
+| Bifrost | Virtual key + base URL → `/api/governance/virtual-keys/quota` budget and rate-limit usage (`api`). |
 | Deepgram | API key → project discovery and usage breakdown API (`api`). |
 | Poe | API key → current point balance and best-effort points history (`api`). |
 | Chutes | API key from config/env → subscription usage and quota API (`api`). |
@@ -187,7 +188,7 @@ complete when the available scan window covers fewer days.
 - Details: `docs/zai.md`.
 
 ## Devin
-- Automatic auth reads the current `auth1_session` token and organization metadata from Chrome localStorage.
+- Automatic auth reads the current `auth1_session` token and organization metadata from supported Chromium browsers' localStorage.
 - Manual auth accepts the `Authorization: Bearer ...` value from an app.devin.ai request.
 - Usage endpoint: `GET /api/<internal-org-id>/billing/quota/usage`.
 - Shows daily and weekly quota percentages with their reset timestamps.
@@ -618,6 +619,14 @@ JavaScriptCore is the macOS rollback engine. The committed `.js` is generated fr
 - Accepts base URLs with or without a `/v1` suffix; management requests are sent to the proxy root.
 - Details: `docs/litellm.md`.
 
+## Bifrost
+- Virtual key from config or `BIFROST_API_KEY`; base URL from config `enterpriseHost` or `BIFROST_BASE_URL` (required).
+- Reads `/api/governance/virtual-keys/quota` with header `x-bf-vk: <virtual key>` — a self-service endpoint, no admin/master key.
+- Budgets are ordered by shortest reset cycle: shortest is the primary window, next is the secondary window, remaining budgets and rate limits appear as additional named windows.
+- An unlimited budget keeps reported spend visible without inventing a quota; absent budget rows do not imply zero spend.
+- A disabled key keeps showing remaining budgets/rate limits with an inactive-key marker rather than erroring, unless it has neither.
+- Details: `docs/bifrost.md`.
+
 ## Poe
 - API key from config or `POE_API_KEY`.
 - Reads the current point balance and recent points history from Poe's official usage API.
@@ -679,3 +688,9 @@ failures. Authentication failures and invalidated account scopes do not restore 
 ## Helmcode
 
 [Helmcode](helmcode.md) reads model quotas from a Chrome dashboard session for Helmcode Cloud or NaN Builders. Cloud is preferred when both tenants are signed in; Manual cookie source uses the selected tenant. Prepaid balance is Cloud-only.
+
+## GitKraken AI
+
+[GitKraken AI](gitkraken.md) uses a bundled plugin with an account access token and optional organization ID.
+Auto and API read personal weekly credits, resets, and organization pool sharing from the first-party API.
+GitKraken CLI sessions and `gk ai tokens` fallback are not supported.

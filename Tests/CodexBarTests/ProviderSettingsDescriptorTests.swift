@@ -9,6 +9,29 @@ import Testing
 @Suite(.serialized)
 struct ProviderSettingsDescriptorTests {
     @Test
+    func `OpenCode Go can add API accounts while automatic cookies are selected`() throws {
+        let fixture = try self.makeSettingsFixture(suite: "ProviderSettingsDescriptorTests-opencodego-accounts")
+        fixture.settings.opencodegoCookieSource = .auto
+        let support = try #require(TokenAccountSupportCatalog.support(for: .opencodego))
+        #expect(OpenCodeGoProviderImplementation().tokenAccountsVisibility(
+            context: fixture.settingsContext(provider: .opencodego), support: support))
+        #expect(support.subtitle.contains("API keys"))
+    }
+
+    @Test
+    func `bifrost exposes only a virtual key and a configured gateway URL`() throws {
+        let fixture = try self.makeSettingsFixture(suite: "ProviderSettingsDescriptorTests-bifrost")
+        let fields = BifrostProviderImplementation()
+            .settingsFields(context: fixture.settingsContext(provider: .bifrost))
+        #expect(fields.map(\.id) == ["bifrost-api-key", "bifrost-base-url"])
+        #expect(fields.map(\.kind) == [.secure, .plain])
+        fields[0].binding.wrappedValue = "fixture-virtual-key"
+        fields[1].binding.wrappedValue = "https://bifrost.example.com"
+        #expect(fixture.settings.providerConfig(for: .bifrost)?.apiKey == "fixture-virtual-key")
+        #expect(fixture.settings.providerConfig(for: .bifrost)?.enterpriseHost == "https://bifrost.example.com")
+    }
+
+    @Test
     func `bedrock discloses monitoring charges before credentials in either authentication mode`() throws {
         let fixture = try self.makeSettingsFixture(suite: "ProviderSettingsDescriptorTests-bedrock-charges")
         let context = fixture.settingsContext(provider: .bedrock)
@@ -762,6 +785,16 @@ extension ProviderSettingsDescriptorTests {
             .detailLine(context)
 
         #expect(detailLine == "web")
+    }
+
+    @Test
+    func `devin automatic auth explains Chromium browser support`() throws {
+        let fixture = try self.makeSettingsFixture(suite: "ProviderSettingsDescriptorTests-devin-browsers")
+        fixture.settings.devinCookieSource = .auto
+        let picker = try #require(DevinProviderImplementation()
+            .settingsPickers(context: fixture.settingsContext(provider: .devin)).first)
+
+        #expect(picker.subtitle == "Automatically imports the app.devin.ai session from Chromium browsers.")
     }
 }
 

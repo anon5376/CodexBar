@@ -216,6 +216,12 @@ Percentages must be finite and are clamped to 0–100. Window minutes are positi
 and a three-letter uppercase currency. Dates are JavaScript `Date` values or ISO-8601 strings. Snapshot identity is
 always scoped to the manifest's instance ID. Data confidence defaults to `unknown`. Details allow at most 8 sections, 24 rows per section, 120 chart points,
 and 120 characters per detail string. Wrong types and limit violations fail the whole fetch instead of truncating it.
+Named extra windows accept an optional `usageKnown` boolean (default `true`). Set it to `false` for reset-only limits:
+the window remains visible as **Unavailable**, and its placeholder `usedPercent` is not presented as measured usage.
+Detail rows accept optional `progress` (a finite consumed fraction from 0 through 1) and `usageValue` (finite raw usage).
+The host maps the fraction to native progress with `used: progress, total: 1`; `usageValue` is preserved independently.
+Absent or null numeric fields leave existing text-only rows unchanged. A supplied `usageKnown` must be a boolean,
+including when the window uses the nested `window` form; null is invalid.
 An identity-only snapshot is useful for balance-only or zero-usage provider states and renders its available account,
 organization, plan/login-method, and account-ID fields in the menu and CLI. A verified response with no displayable data
 may return `{empty: true}` with optional identity. This creates no artificial rate window; every supplied field is still
@@ -223,6 +229,10 @@ validated. An empty object, an empty `identity` object, or metadata such as conf
 displayable usage or identity remains invalid unless `empty: true` is explicitly declared.
 
 ## TypeScript
+
+Moonshot's bundled `moonshot.ts` runs on both engines. Its Swift descriptor resolves the regional credential and passes
+the selected origin as `BASE_URL`; the plugin validates the fixed International/China origins and uses
+`ctx.format.currency` for identity-only balance and deficit text. See [Moonshot](moonshot.md).
 
 [`codexbar-plugin.d.ts`](../Sources/CodexBarCore/Resources/Plugins/codexbar-plugin.d.ts) is the canonical authoring
 contract for `defineProvider`, the `ctx` host API, manifests, and usage snapshots. Bundled plugins may use that contract
@@ -253,7 +263,7 @@ change to instance ID, normalized origins, auth mode/header, secure setting name
 invalidates approval before the next request. There is no bulk approval or import path.
 
 Bundled first-party plugins do not use the interactive plugin-approval flow. The private-network HTTP policy is therefore
-accepted for bundled code only for LLM Proxy and LiteLLM, whose existing Swift providers already permit exactly those
+accepted for bundled code only for LLM Proxy, LiteLLM, and Bifrost, whose configured gateways permit exactly those
 targets. Other bundled providers fail manifest validation if they request that policy.
 
 `codexbar plugins list` shows locally discovered plugins. `codexbar plugins fetch <id>` displays the same approval
@@ -299,3 +309,8 @@ cache and browser import, and Off fails before either is accessed.
 Call `ctx.browser.rejectCookie(domain)` after the server rejects a session. The host checks the declared domain and
 evicts only the cached entry observed by that fetch (each domain is pinned for the fetch lifetime); a newer session and other domains remain intact. Manual headers
 are never erased. User plugins have no persistent cookie cache, so rejection is a validated no-op for them.
+
+## GitKraken AI bundled provider
+
+[GitKraken AI](gitkraken.md) uses bearer GET against its declared first-party API origin, with optional
+organization scope and generic weekly windows/details. Swift supplies only registration and config projection.

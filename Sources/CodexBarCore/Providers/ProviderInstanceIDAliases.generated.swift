@@ -57,6 +57,7 @@ extension ProviderInstanceID {
     public static let groq = UsageProvider.groq.instanceID
     public static let llmproxy = UsageProvider.llmproxy.instanceID
     public static let litellm = UsageProvider.litellm.instanceID
+    public static let bifrost = UsageProvider.bifrost.instanceID
     public static let deepgram = UsageProvider.deepgram.instanceID
     public static let poe = UsageProvider.poe.instanceID
     public static let chutes = UsageProvider.chutes.instanceID
@@ -80,6 +81,7 @@ extension ProviderInstanceID {
     public static let pi = UsageProvider.pi.instanceID
     public static let v0 = UsageProvider.v0.instanceID
     public static let typesafe = UsageProvider.typesafe.instanceID
+    public static let gitkraken = UsageProvider.gitkraken.instanceID
 }
 
 // swiftformat:enable sortDeclarations

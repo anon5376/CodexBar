@@ -73,6 +73,7 @@ public enum UsageProvider: String, CaseIterable, Sendable, Codable {
     case groq
     case llmproxy
     case litellm
+    case bifrost
     case deepgram
     case poe
     case chutes
@@ -96,6 +97,7 @@ public enum UsageProvider: String, CaseIterable, Sendable, Codable {
     case pi
     case v0
     case typesafe
+    case gitkraken
 }
 
 // swiftformat:enable sortDeclarations

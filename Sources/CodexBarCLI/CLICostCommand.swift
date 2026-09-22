@@ -673,6 +673,7 @@ extension CodexBarCLI {
     {
         let daily = snapshot?.daily.map(Self.costDailyPayload(from:)) ?? []
         let summary = snapshot.map { $0.summary(forLastDays: $0.historyDays, calendar: calendar) }
+        let last30Days = snapshot.map { Self.last30DaysTotals(from: $0, calendar: calendar) }
         let projects = provider == .codex
             ? snapshot?.projects.map { project in
                 CostProjectPayload(
@@ -704,8 +705,8 @@ extension CodexBarCLI {
             sessionCostUSD: snapshot?.sessionCostUSD,
             historyDays: snapshot?.historyDays,
             historyCoverageIsEstablished: snapshot?.historyCoverageIsEstablished,
-            last30DaysTokens: snapshot?.last30DaysTokens,
-            last30DaysCostUSD: snapshot?.last30DaysCostUSD,
+            last30DaysTokens: last30Days?.tokens,
+            last30DaysCostUSD: last30Days?.costUSD,
             meteredCostUSD: snapshot?.meteredCostUSD,
             daily: daily,
             projects: projects,
@@ -722,6 +723,7 @@ extension CodexBarCLI {
         calendar: Calendar = .current) -> CostPayload
     {
         let summary = snapshot.summary(forLastDays: snapshot.historyDays, calendar: calendar)
+        let last30Days = self.last30DaysTotals(from: snapshot, calendar: calendar)
         return CostPayload(
             provider: OpenCodexUsageLog.sourceID,
             source: "opencodex",
@@ -731,8 +733,8 @@ extension CodexBarCLI {
             sessionCostUSD: snapshot.sessionCostUSD,
             historyDays: snapshot.historyDays,
             historyCoverageIsEstablished: snapshot.historyCoverageIsEstablished,
-            last30DaysTokens: snapshot.last30DaysTokens,
-            last30DaysCostUSD: snapshot.last30DaysCostUSD,
+            last30DaysTokens: last30Days.tokens,
+            last30DaysCostUSD: last30Days.costUSD,
             meteredCostUSD: nil,
             daily: snapshot.daily.map(self.costDailyPayload(from:)),
             projects: [],
@@ -740,6 +742,22 @@ extension CodexBarCLI {
             provenance: CostProvenance.listPriceEstimate.rawValue,
             coverage: summary.coverage,
             error: nil)
+    }
+
+    private static func last30DaysTotals(
+        from snapshot: CostUsageTokenSnapshot,
+        calendar: Calendar) -> (tokens: Int?, costUSD: Double?)
+    {
+        // Snapshot aggregates describe the selected history. Keep the legacy short-history contract.
+        guard snapshot.historyDays > 30 else {
+            return (snapshot.last30DaysTokens, snapshot.last30DaysCostUSD)
+        }
+        let summary = snapshot.summary(forLastDays: 30, calendar: calendar)
+        if summary.entryCount == 0, snapshot.historyIsFullyScanned {
+            // Only known full-history amounts establish zero for an empty, fully scanned window.
+            return (snapshot.last30DaysTokens == nil ? nil : 0, snapshot.last30DaysCostUSD == nil ? nil : 0)
+        }
+        return (summary.totalTokens, summary.totalCostUSD)
     }
 
     private static func loadOpenCodexCostPayload(
@@ -959,31 +977,13 @@ enum CursorCostAvailabilityError: LocalizedError {
 }
 
 struct CostOptions: CommanderParsable {
-    @Flag(names: [.short("v"), .long("verbose")], help: "Enable verbose logging")
-    var verbose: Bool = false
-
-    @Flag(name: .long("json-output"), help: "Emit machine-readable logs")
-    var jsonOutput: Bool = false
-
-    @Option(name: .long("log-level"), help: "Set log level (trace|verbose|debug|info|warning|error|critical)")
-    var logLevel: String?
+    @OptionGroup
+    var common: CLICommonOptions
 
     @Option(
         name: .long("provider"),
         help: ProviderHelp.optionHelp)
     var provider: ProviderSelection?
-
-    @Option(name: .long("format"), help: "Output format: text | json")
-    var format: OutputFormat?
-
-    @Flag(name: .long("json"), help: "")
-    var jsonShortcut: Bool = false
-
-    @Flag(name: .long("json-only"), help: "Emit JSON only (suppress non-JSON output)")
-    var jsonOnly: Bool = false
-
-    @Flag(name: .long("pretty"), help: "Pretty-print JSON output")
-    var pretty: Bool = false
 
     @Flag(name: .long("no-color"), help: "Disable ANSI colors in text output")
     var noColor: Bool = false

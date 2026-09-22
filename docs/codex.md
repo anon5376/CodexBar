@@ -45,6 +45,10 @@ Usage source picker:
 - Credits-only updates preserve pending weekly-reset evidence in memory and account-snapshot storage, including
   when published credits are cleared. Candidate admission, expiry, boundary tolerances, and account guards remain
   unchanged; preserving evidence does not make an otherwise incompatible reset eligible for publication.
+- Delayed confirmation also accepts an unused weekly window whose reset date advances with observation time:
+  both observations must report zero usage, a seven-day duration, and a reset within two minutes of a full week
+  ahead. The later reset must not move backward. Exact OAuth, account, plan, unchanged positive reset-credit
+  inventory, minimum confirmation age, and candidate expiry checks still apply.
 - Debug logs in `codex-weekly-reset-publication` include fixed reason codes for delayed-candidate
   creation, pruning, revalidation, and account-scoped storage requests. They distinguish source/confidence,
   timing, boundary, identity/plan compatibility, and credit-inventory failures without logging account or credit
@@ -287,6 +291,7 @@ the local result and returns a nonzero exit code. See [CLI host reporting](cli.m
     connection, database identity and SQLite change observations,
     checking again under the writer lock. Filesystem/anchor and catch-up reconciliation still run at comparison
     time; a concurrent database change requests a rescan. Fresh database opens retain integrity validation.
+  - Scan loads also retain decoded baselines for up to four recently used cache roots while the database stamp is unchanged. Each load issues a fresh save receipt and rechecks transcript identity; writes, failed operations, schema changes, and database replacement invalidate reuse.
   - Up to four recently used cache roots retain validated reader connections and decoded status/activity data.
     External writes invalidate cached data; database replacement or incompatible metadata reopens the reader through
     existing validation on its next access. Every read still reconciles file identities, and detailed report history
@@ -311,7 +316,8 @@ the local result and returns a nonzero exit code. See [CLI host reporting](cli.m
     They contribute no usage and reparse from the start if they grow. Usage-bearing duplicates and incomplete fragments
     keep their existing accounting and retry rules. Existing 0.56.4 cost caches are adopted without rebuilding
     stored usage, retained reports, or partial-scan checkpoints.
-  - Priority trace scans resume after ordinary log pruning when enough distributed content anchors still match;
+  - On macOS and Linux, local Priority/Fast pricing evidence is read from the host's Codex SQLite trace database.
+    Priority trace scans resume after ordinary log pruning when enough distributed content anchors still match;
     changed source rows, replaced databases, or insufficient matching anchors require a fresh scan. Temporary
     trace-database failures retain the last validated report pricing and leave scan freshness unchanged for retry.
     Successful historical queries update their own pricing window independently of the live scan cursor, including
@@ -329,6 +335,7 @@ the local result and returns a nonzero exit code. See [CLI host reporting](cli.m
 - A catch-up worker that loses its account or settings scope clears its abandoned Refreshing activity on exit. Legitimate pauses remain visible, and an older worker cannot clear a replacement worker's activity.
 - Cache-wide migration reseeding keeps paths already waiting ahead of new revisits. Repeated pricing or priority-turn changes therefore cannot keep the same completed files ahead of the stale tail in each 512-candidate pass. Initial seeding still honors newest-first preference, and publication waits for exact inventory validation. Native Codex stores from published parser fingerprint `4969a789db679c93` adopt the new generation without rebuilding rows, checkpoints, or retained reports; Pi/OMP retains its existing one-time reparse on a parser-hash change.
 - When a warm cost refresh reaches its time limit, it saves the remaining file work and completed discovery. Compatible shorter/wider history requests resume that work across the retained scan range; publication still waits for exact inventory validation.
+- Quota-week menu cards reuse the immutable snapshot’s day projection, warmed in the background. New snapshots and changed bucket time zones rebuild it; reset observations and the current time remain live on every card build.
 - Inline cost charts preserve a slot for every day in that window, using the selected cost-bucket time zone and the snapshot's date. Missing days are zero only after history coverage is established; unscanned days and entries without prices remain unknown. Long windows fit within the menu width without dropping dates.
 - **Hide personal information** also replaces account-switcher emails with numbered labels and sanitizes email addresses embedded in workspace hints. Narrow switchers retain the account number, and tooltips use the same labels without emails.
 - **Hide personal information** replaces project/source names with numbered labels and hides their paths in the cost-history submenu; Usage & Spend also masks project names. Costs, tokens, grouping, and stored history are unchanged, and disabling the setting restores the original labels. This is display masking, not data deletion or export sanitization.
