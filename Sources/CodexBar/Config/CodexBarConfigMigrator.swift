@@ -89,11 +89,8 @@ struct CodexBarConfigMigrator {
             return config.normalized()
         }
 
-        // The migrated Kimi cookie lives in config.json now; drop the plaintext UserDefaults
-        // copy. Runs every launch so already-migrated installs also lose the stale value. Heals
-        // straight from the defaults value — the token store can hit Keychain — and removes the
-        // key only once a persisted config actually holds the cookie, so a failed save never
-        // deletes the last copy of the credential.
+        // Drop the plaintext Kimi cookie once config holds it. Heals from defaults directly (the token store
+        // can read Keychain) and keeps the key when the save fails.
         if let cookie = userDefaults.string(forKey: "kimiManualCookieHeader") {
             var needsSave = false
             // Provider-specific by design: kimiManualCookieHeader was Kimi's retired plaintext cookie key.
@@ -118,10 +115,7 @@ struct CodexBarConfigMigrator {
         }
 
         if state.sawLegacySecrets || state.sawLegacyAccounts {
-            let cleared = self.clearLegacyStores(
-                stores: stores,
-                sawAccounts: state.sawLegacyAccounts,
-                log: log)
+            let cleared = self.clearLegacyStores(stores: stores, sawAccounts: state.sawLegacyAccounts, log: log)
             if cleared {
                 userDefaults.set(true, forKey: Self.legacyMigrationCompletedKey)
             }

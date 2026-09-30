@@ -32,9 +32,9 @@ public enum LogRedactor {
     private static let jwtRegex = Self.makeRegex(
         pattern: #"\beyJ[a-zA-Z0-9_\-]+\.[a-zA-Z0-9_\-]+\.[a-zA-Z0-9_\-]+"#)
     private static let apiKeyLabelRegex = Self.makeRegex(
-        pattern: #"(?i)((?:x-)?api[-_\s]?key"?\s*[:=]\s*"?)([^"'\s,;&\r\n}\]]+)"#)
+        pattern: #"(?i)(\b(?:x-)?api[-_\s]?key"?\s*[:=]\s*"?)([^"'\s,;&\r\n}\]]+)"#)
     private static let querySecretRegex = Self.makeRegex(
-        pattern: #"(?i)([?&](?:token|key|api[-_]?key|access_token|sig)=)([^&\s"']+)"#)
+        pattern: #"(?i)([?&](?:token|key|api[-_]?key|access_token|sig)=)([^&\s"'<>)#]+)"#)
 
     public static func redact(_ text: String) -> String {
         guard self.mayContainSensitiveValue(text) else { return text }
@@ -77,7 +77,8 @@ public enum LogRedactor {
         if text.range(of: "api_key", options: [.caseInsensitive]) != nil { return true }
         if text.range(of: "apikey", options: [.caseInsensitive]) != nil { return true }
         if text.range(of: "token=", options: [.caseInsensitive]) != nil { return true }
-        if text.range(of: "key=", options: [.caseInsensitive]) != nil { return true }
+        if text.range(of: "?key=", options: [.caseInsensitive]) != nil { return true }
+        if text.range(of: "&key=", options: [.caseInsensitive]) != nil { return true }
         if text.range(of: "sig=", options: [.caseInsensitive]) != nil { return true }
         return false
     }

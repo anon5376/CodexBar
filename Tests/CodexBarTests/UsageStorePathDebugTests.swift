@@ -52,4 +52,30 @@ struct UsageStorePathDebugTests {
 
         #expect(debugLog == "DEEPSEEK_API_KEY=present source=settings-token-account")
     }
+
+    @Test
+    func `debug log output is redacted`() async throws {
+        let suite = "UsageStorePathDebugTests-debug-log-redaction-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defaults.removePersistentDomain(forName: suite)
+        let configStore = testConfigStore(suiteName: suite)
+        let settings = SettingsStore(
+            userDefaults: defaults,
+            configStore: configStore,
+            zaiTokenStore: NoopZaiTokenStore())
+        let store = UsageStore(
+            fetcher: UsageFetcher(),
+            browserDetection: BrowserDetection(cacheTTL: 0),
+            settings: settings,
+            startupBehavior: .testing,
+            environmentBase: [:])
+        store.probeLogs[UsageProvider.codex.instanceID] =
+            "Authorization: Bearer fixture-token-value\nContact: user@example.com"
+
+        let text = await store.debugLog(for: .codex)
+
+        #expect(!text.contains("fixture-token-value"))
+        #expect(!text.contains("user@example.com"))
+        #expect(text.contains("Authorization: <redacted>"))
+    }
 }

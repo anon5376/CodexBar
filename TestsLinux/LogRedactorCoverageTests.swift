@@ -104,6 +104,22 @@ struct LogRedactorCoverageTests {
     }
 
     @Test
+    func `query secret stops at url delimiters`() {
+        let input = "see <https://api.example.com/v1?token=secretvalue123> and (https://x.example?sig=abc123#frag)"
+        let redacted = LogRedactor.redact(input)
+        #expect(redacted.contains("secretvalue123") == false)
+        #expect(redacted.contains("abc123") == false)
+        #expect(redacted.contains("?token=<redacted>>"))
+        #expect(redacted.contains("?sig=<redacted>#frag)"))
+    }
+
+    @Test
+    func `identifier ending in api key is not treated as a label`() {
+        let input = "wrapi_key=plainvalue"
+        #expect(LogRedactor.redact(input) == input)
+    }
+
+    @Test
     func `url query token parameter is redacted`() {
         let input = "https://api.example.com/v1/usage?token=secretvalue123&format=json"
         let redacted = LogRedactor.redact(input)
