@@ -35,7 +35,14 @@ struct CodexBarConfigMigrator {
         stores: LegacyStores) -> CodexBarConfig
     {
         let log = CodexBarLog.logger(LogCategories.configMigration)
-        let existing = try? configStore.load()
+        let existing: CodexBarConfig?
+        var configUnreadable = false
+        do {
+            existing = try configStore.load()
+        } catch {
+            existing = nil
+            configUnreadable = true
+        }
         var config = (existing ?? CodexBarConfig.makeDefault()).normalized()
         var state = MigrationState()
 
@@ -89,12 +96,13 @@ struct CodexBarConfigMigrator {
             return config.normalized()
         }
 
-        // Drop the plaintext Kimi cookie once config holds it. Heals from defaults directly (the token store
-        // can read Keychain) and keeps the key when the save fails.
-        if let cookie = userDefaults.string(forKey: "kimiManualCookieHeader") {
+        // Drop the plaintext Kimi cookie once config holds it. An existing config is authoritative
+        // (an empty cookie was cleared by the user), so only a missing config is healed from defaults;
+        // keep the key if the config is unreadable or the save fails.
+        if !configUnreadable, let cookie = userDefaults.string(forKey: "kimiManualCookieHeader") {
             var needsSave = false
             // Provider-specific by design: kimiManualCookieHeader was Kimi's retired plaintext cookie key.
-            if !cookie.isEmpty, config.providerConfig(for: .kimi)?.cookieHeader?.isEmpty != false {
+            if existing == nil, !cookie.isEmpty, config.providerConfig(for: .kimi)?.cookieHeader?.isEmpty != false {
                 self.updateProvider(.kimi, config: &config, state: &state) { entry in
                     self.setIfEmpty(&entry.cookieHeader, cookie)
                 }
