@@ -54,7 +54,7 @@ struct UsageStorePathDebugTests {
     }
 
     @Test
-    func `debug log output is redacted`() async throws {
+    func `debug log exports are redacted while the pane text stays raw`() async throws {
         let suite = "UsageStorePathDebugTests-debug-log-redaction-\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suite))
         defaults.removePersistentDomain(forName: suite)
@@ -72,10 +72,13 @@ struct UsageStorePathDebugTests {
         store.probeLogs[UsageProvider.codex.instanceID] =
             "Authorization: Bearer fixture-token-value\nContact: user@example.com"
 
-        let text = await store.debugLog(for: .codex)
+        let exported = await store.redactedDebugLog(for: .codex)
 
-        #expect(!text.contains("fixture-token-value"))
-        #expect(!text.contains("user@example.com"))
-        #expect(text.contains("Authorization: <redacted>"))
+        #expect(!exported.contains("fixture-token-value"))
+        #expect(!exported.contains("user@example.com"))
+        #expect(exported.contains("Authorization: <redacted>"))
+
+        let paneText = await store.debugLog(for: .codex)
+        #expect(paneText.contains("user@example.com"))
     }
 }

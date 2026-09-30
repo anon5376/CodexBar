@@ -1041,7 +1041,7 @@ final class UsageStore {
 
 extension UsageStore {
     func dumpLog(toFileFor provider: UsageProvider) async -> URL? {
-        let text = await self.debugLog(for: provider)
+        let text = await self.redactedDebugLog(for: provider)
         let filename = "codexbar-\(provider.rawValue)-probe.txt"
         let url = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(filename)
         do {
@@ -1057,9 +1057,13 @@ extension UsageStore {
         }
     }
 
+    func redactedDebugLog(for provider: UsageProvider) async -> String {
+        LogRedactor.redact(await self.debugLog(for: provider))
+    }
+
     func debugLog(for provider: UsageProvider) async -> String {
         if let cached = self.probeLogs[provider.instanceID], !cached.isEmpty {
-            return LogRedactor.redact(cached)
+            return cached
         }
 
         let claudeWebExtrasEnabled = self.settings.claudeWebExtrasEnabled
@@ -1184,7 +1188,7 @@ extension UsageStore {
             }
         }.value
         self.probeLogs[provider.instanceID] = text
-        return LogRedactor.redact(text)
+        return text
     }
 
     private func makeClaudeDebugConfiguration(

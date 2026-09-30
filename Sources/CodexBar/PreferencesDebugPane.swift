@@ -506,7 +506,7 @@ struct DebugPane: View {
     private func copyToPasteboard(_ text: String) {
         let pb = NSPasteboard.general
         pb.clearContents()
-        pb.setString(text, forType: .string)
+        pb.setString(LogRedactor.redact(text), forType: .string)
     }
 
     private func binaryRow(title: String, value: String?) -> some View {
