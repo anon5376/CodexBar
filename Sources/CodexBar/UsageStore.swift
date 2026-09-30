@@ -1058,7 +1058,7 @@ extension UsageStore {
     }
 
     func redactedDebugLog(for provider: UsageProvider) async -> String {
-        LogRedactor.redact(await self.debugLog(for: provider))
+        await LogRedactor.redact(self.debugLog(for: provider))
     }
 
     func debugLog(for provider: UsageProvider) async -> String {
