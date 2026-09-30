@@ -277,6 +277,68 @@ struct CodexBarConfigMigratorTests {
         #expect(defaults.bool(forKey: Self.legacyMigrationCompletedKey))
     }
 
+    @Test
+    func `migrated kimi cookie is removed from user defaults after cleanup`() throws {
+        let suite = "CodexBarConfigMigratorTests-kimi-cookie-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defaults.removePersistentDomain(forName: suite)
+        defer { defaults.removePersistentDomain(forName: suite) }
+        defaults.set("fixture-cookie=manual", forKey: "kimiManualCookieHeader")
+
+        let secrets = CountingLegacySecretStore(token: "legacy-token")
+        let stores = Self.legacyStores(secrets: secrets, accountStore: CountingTokenAccountStore())
+        let configStore = testConfigStore(suiteName: suite)
+
+        _ = Self.migrate(configStore: configStore, defaults: defaults, stores: stores)
+
+        #expect(defaults.string(forKey: "kimiManualCookieHeader") == nil)
+        #expect(defaults.bool(forKey: Self.legacyMigrationCompletedKey))
+    }
+
+    @Test
+    func `already migrated kimi cookie is removed from user defaults on next launch`() throws {
+        let suite = "CodexBarConfigMigratorTests-kimi-cookie-done-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defaults.removePersistentDomain(forName: suite)
+        defer { defaults.removePersistentDomain(forName: suite) }
+        defaults.set("fixture-cookie=manual", forKey: "kimiManualCookieHeader")
+        defaults.set(true, forKey: Self.legacyMigrationCompletedKey)
+
+        let secrets = CountingLegacySecretStore(token: nil)
+        let stores = Self.legacyStores(secrets: secrets, accountStore: CountingTokenAccountStore())
+        let configStore = testConfigStore(suiteName: suite)
+
+        _ = Self.migrate(configStore: configStore, defaults: defaults, stores: stores)
+
+        #expect(defaults.string(forKey: "kimiManualCookieHeader") == nil)
+        #expect(try configStore.load()?.providerConfig(for: .kimi)?.cookieHeader == "fixture-cookie=manual")
+        #expect(defaults.bool(forKey: Self.legacyMigrationCompletedKey))
+    }
+
+    @Test
+    func `kimi defaults cookie is kept when the healing save fails`() throws {
+        let suite = "CodexBarConfigMigratorTests-kimi-cookie-save-fail-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defaults.removePersistentDomain(forName: suite)
+        defer { defaults.removePersistentDomain(forName: suite) }
+        defaults.set("fixture-cookie=manual", forKey: "kimiManualCookieHeader")
+        defaults.set(true, forKey: Self.legacyMigrationCompletedKey)
+
+        let secrets = CountingLegacySecretStore(token: nil)
+        let stores = Self.legacyStores(secrets: secrets, accountStore: CountingTokenAccountStore())
+
+        // A regular file where the config directory should be makes every save() throw.
+        let blocker = FileManager.default.temporaryDirectory
+            .appendingPathComponent("codexbar-migrator-block-\(UUID().uuidString)")
+        _ = FileManager.default.createFile(atPath: blocker.path, contents: Data())
+        defer { try? FileManager.default.removeItem(at: blocker) }
+        let configStore = CodexBarConfigStore(fileURL: blocker.appendingPathComponent("config.json"))
+
+        _ = Self.migrate(configStore: configStore, defaults: defaults, stores: stores)
+
+        #expect(defaults.string(forKey: "kimiManualCookieHeader") == "fixture-cookie=manual")
+    }
+
     private static func migrate(
         configStore: CodexBarConfigStore,
         defaults: UserDefaults,
